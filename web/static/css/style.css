@@ -3132,6 +3132,164 @@ header {
     line-height: 1.6;
 }
 
+/* 系统设置 - 终端 */
+.terminal-wrapper {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+    background: #0d1117;
+}
+
+.terminal-tabs {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0;
+    padding: 6px 10px 0;
+    background: #161b22;
+    border-bottom: 1px solid var(--border-color);
+    min-height: 36px;
+}
+
+.terminal-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px 5px 12px;
+    font-size: 0.8125rem;
+    color: #8b949e;
+    background: transparent;
+    border: none;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    margin-right: 2px;
+}
+
+.terminal-tab-label {
+    cursor: pointer;
+}
+
+.terminal-tab-close {
+    padding: 0;
+    width: 18px;
+    height: 18px;
+    font-size: 1.1rem;
+    line-height: 1;
+    color: #8b949e;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.terminal-tab-close:hover {
+    color: #ff7b72;
+    background: rgba(255, 123, 114, 0.15);
+}
+
+.terminal-tab:hover {
+    color: #e6edf3;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.terminal-tab.active {
+    color: #e6edf3;
+    background: #0d1117;
+    font-weight: 500;
+}
+
+.terminal-tab-new {
+    margin-left: 4px;
+    width: 28px;
+    height: 28px;
+    font-size: 1.125rem;
+    line-height: 1;
+    color: #8b949e;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.terminal-tab-new:hover {
+    color: #58a6ff;
+    background: rgba(88, 166, 255, 0.1);
+    border-color: rgba(88, 166, 255, 0.3);
+}
+
+.terminal-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #161b22;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.terminal-toolbar-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #8b949e;
+    letter-spacing: 0.02em;
+}
+
+.terminal-btn {
+    padding: 6px 12px;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.terminal-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: #8b949e;
+}
+
+.terminal-panes {
+    position: relative;
+    min-height: 400px;
+}
+
+.terminal-pane {
+    display: none;
+    min-height: 400px;
+}
+
+.terminal-pane.active {
+    display: block;
+}
+
+.terminal-container {
+    min-height: 400px;
+    padding: 8px;
+    box-sizing: border-box;
+}
+
+.terminal-container .xterm {
+    padding: 0;
+}
+
+.terminal-container .xterm-viewport {
+    border-radius: 0;
+}
+
+.terminal-error {
+    color: #ff7b72;
+    padding: 16px;
+    font-size: 0.875rem;
+}
+
 .settings-section {
     margin-bottom: 32px;
 }

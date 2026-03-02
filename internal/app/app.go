@@ -325,6 +325,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	roleHandler.SetSkillsManager(skillsManager) // 设置Skills管理器到RoleHandler
 	skillsHandler := handler.NewSkillsHandler(skillsManager, cfg, configPath, log.Logger)
 	fofaHandler := handler.NewFofaHandler(cfg, log.Logger)
+	terminalHandler := handler.NewTerminalHandler(log.Logger)
 	if db != nil {
 		skillsHandler.SetDB(db) // 设置数据库连接以便获取调用统计
 	}
@@ -431,6 +432,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		roleHandler,
 		skillsHandler,
 		fofaHandler,
+		terminalHandler,
 		mcpServer,
 		authManager,
 		openAPIHandler,
@@ -542,6 +544,7 @@ func setupRoutes(
 	roleHandler *handler.RoleHandler,
 	skillsHandler *handler.SkillsHandler,
 	fofaHandler *handler.FofaHandler,
+	terminalHandler *handler.TerminalHandler,
 	mcpServer *mcp.Server,
 	authManager *security.AuthManager,
 	openAPIHandler *handler.OpenAPIHandler,
@@ -627,6 +630,10 @@ func setupRoutes(
 		protected.GET("/config/tools", configHandler.GetTools)
 		protected.PUT("/config", configHandler.UpdateConfig)
 		protected.POST("/config/apply", configHandler.ApplyConfig)
+
+		// 系统设置 - 终端（执行命令，提高运维效率）
+		protected.POST("/terminal/run", terminalHandler.RunCommand)
+		protected.POST("/terminal/run/stream", terminalHandler.RunCommandStream)
 
 		// 外部MCP管理
 		protected.GET("/external-mcp", externalMCPHandler.GetExternalMCPs)

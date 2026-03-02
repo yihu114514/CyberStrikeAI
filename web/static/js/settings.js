@@ -46,6 +46,9 @@ function switchSettingsSection(section) {
     if (activeContent) {
         activeContent.classList.add('active');
     }
+    if (section === 'terminal' && typeof initTerminal === 'function') {
+        setTimeout(initTerminal, 0);
+    }
 }
 
 // 打开设置

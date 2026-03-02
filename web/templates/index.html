@@ -7,6 +7,7 @@
     <link rel="icon" type="image/png" href="/static/logo.png">
     <link rel="shortcut icon" type="image/png" href="/static/favicon.ico">
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.19.0/css/xterm.css">
 </head>
 <body>
     <div id="login-overlay" class="login-overlay" style="display: none;">
@@ -1074,6 +1075,9 @@
                                 <div class="settings-nav-item" data-section="robots" onclick="switchSettingsSection('robots')">
                                     <span>机器人设置</span>
                                 </div>
+                                <div class="settings-nav-item" data-section="terminal" onclick="switchSettingsSection('terminal')">
+                                    <span>终端</span>
+                                </div>
                                 <div class="settings-nav-item" data-section="security" onclick="switchSettingsSection('security')">
                                     <span>安全设置</span>
                                 </div>
@@ -1317,6 +1321,25 @@
 
                                 <div class="settings-actions">
                                     <button class="btn-primary" onclick="applySettings()">应用配置</button>
+                                </div>
+                            </div>
+
+                            <!-- 终端 -->
+                            <div id="settings-section-terminal" class="settings-section-content">
+                                <div class="settings-section-header">
+                                    <h3>终端</h3>
+                                    <p class="settings-description">在服务器上执行命令，便于运维与调试。命令在服务端执行，请勿执行敏感或破坏性操作。</p>
+                                </div>
+                                <div class="terminal-wrapper">
+                                    <div class="terminal-tabs">
+                                        <div class="terminal-tab active" data-tab-id="1"><span class="terminal-tab-label" onclick="switchTerminalTab(1)">终端 1</span><button type="button" class="terminal-tab-close" onclick="removeTerminalTab(1); event.stopPropagation();" title="关闭">×</button></div>
+                                        <button type="button" class="terminal-tab-new" onclick="addTerminalTab()" title="新终端">+</button>
+                                    </div>
+                                    <div class="terminal-panes">
+                                        <div id="terminal-pane-1" class="terminal-pane active">
+                                            <div id="terminal-container-1" class="terminal-container"></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -2144,6 +2167,9 @@ version: 1.0.0<br>
     <script src="/static/js/monitor.js"></script>
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/settings.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@4.19.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.5.0/lib/xterm-addon-fit.js"></script>
+    <script src="/static/js/terminal.js"></script>
     <script src="/static/js/knowledge.js"></script>
     <script src="/static/js/skills.js"></script>
     <script src="/static/js/vulnerability.js?v=4"></script>
