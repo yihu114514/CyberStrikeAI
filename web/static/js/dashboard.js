@@ -38,10 +38,25 @@ async function refreshDashboard() {
             apiFetch('/api/skills/stats').then(r => r.ok ? r.json() : null).catch(() => null)
         ]);
 
+        // 运行中任务：Agent 循环任务 + 批量队列「执行中」数量统一统计，避免顶部 KPI 与运行概览不一致
+        let agentRunningCount = null;
         if (tasksRes && Array.isArray(tasksRes.tasks)) {
-            if (runningEl) runningEl.textContent = String(tasksRes.tasks.length);
-        } else {
-            if (runningEl) runningEl.textContent = '-';
+            agentRunningCount = tasksRes.tasks.length;
+        }
+        let batchRunningCount = 0;
+        if (batchRes && Array.isArray(batchRes.queues)) {
+            batchRes.queues.forEach(q => {
+                if ((q.status || '').toLowerCase() === 'running') batchRunningCount++;
+            });
+        }
+        if (runningEl) {
+            if (agentRunningCount !== null) {
+                runningEl.textContent = String(agentRunningCount + batchRunningCount);
+            } else if (batchRes && Array.isArray(batchRes.queues)) {
+                runningEl.textContent = String(batchRunningCount);
+            } else {
+                runningEl.textContent = '-';
+            }
         }
 
         if (vulnRes && typeof vulnRes.total === 'number') {
@@ -63,14 +78,14 @@ async function refreshDashboard() {
             });
         }
 
-        // 批量任务队列：按状态统计（优化版）
+        // 批量任务队列：按状态统计（优化版；running 与上方 batchRunningCount 一致）
         if (batchRes && Array.isArray(batchRes.queues)) {
             const queues = batchRes.queues;
-            let pending = 0, running = 0, done = 0;
+            let pending = 0, running = batchRunningCount, done = 0;
             queues.forEach(q => {
                 const s = (q.status || '').toLowerCase();
                 if (s === 'pending' || s === 'paused') pending++;
-                else if (s === 'running') running++;
+                else if (s === 'running') { /* already counted into batchRunningCount */ }
                 else if (s === 'completed' || s === 'cancelled') done++;
             });
             const total = pending + running + done;
