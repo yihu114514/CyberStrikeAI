@@ -320,6 +320,7 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 	attackChainHandler := handler.NewAttackChainHandler(db, &cfg.OpenAI, log.Logger)
 	vulnerabilityHandler := handler.NewVulnerabilityHandler(db, log.Logger)
 	webshellHandler := handler.NewWebShellHandler(log.Logger, db)
+	registerWebshellTools(mcpServer, db, webshellHandler, log.Logger)
 	configHandler := handler.NewConfigHandler(configPath, cfg, mcpServer, executor, agent, attackChainHandler, externalMCPMgr, log.Logger)
 	externalMCPHandler := handler.NewExternalMCPHandler(externalMCPMgr, cfg, configPath, log.Logger)
 	roleHandler := handler.NewRoleHandler(cfg, configPath, log.Logger)
@@ -364,6 +365,13 @@ func New(cfg *config.Config, log *logger.Logger) (*App, error) {
 		return nil
 	}
 	configHandler.SetVulnerabilityToolRegistrar(vulnerabilityRegistrar)
+
+	// 设置 WebShell 工具注册器（ApplyConfig 时重新注册）
+	webshellRegistrar := func() error {
+		registerWebshellTools(mcpServer, db, webshellHandler, log.Logger)
+		return nil
+	}
+	configHandler.SetWebshellToolRegistrar(webshellRegistrar)
 
 	// 设置Skills工具注册器（内置工具，必须设置）
 	skillsRegistrar := func() error {
@@ -823,6 +831,8 @@ func setupRoutes(
 		// WebShell 管理（代理执行 + 连接配置存 SQLite）
 		protected.GET("/webshell/connections", webshellHandler.ListConnections)
 		protected.POST("/webshell/connections", webshellHandler.CreateConnection)
+		protected.GET("/webshell/connections/:id/ai-history", webshellHandler.GetAIHistory)
+		protected.GET("/webshell/connections/:id/ai-conversations", webshellHandler.ListAIConversations)
 		protected.PUT("/webshell/connections/:id", webshellHandler.UpdateConnection)
 		protected.DELETE("/webshell/connections/:id", webshellHandler.DeleteConnection)
 		protected.POST("/webshell/exec", webshellHandler.Exec)
@@ -1065,6 +1075,158 @@ func registerVulnerabilityTool(mcpServer *mcp.Server, db *database.DB, logger *z
 
 	mcpServer.RegisterTool(tool, handler)
 	logger.Info("漏洞记录工具注册成功")
+}
+
+// registerWebshellTools 注册 WebShell 相关 MCP 工具，供 AI 助手在指定连接上执行命令与文件操作
+func registerWebshellTools(mcpServer *mcp.Server, db *database.DB, webshellHandler *handler.WebShellHandler, logger *zap.Logger) {
+	if db == nil || webshellHandler == nil {
+		logger.Warn("跳过 WebShell 工具注册：db 或 webshellHandler 为空")
+		return
+	}
+
+	// webshell_exec
+	execTool := mcp.Tool{
+		Name:             builtin.ToolWebshellExec,
+		Description:      "在指定的 WebShell 连接上执行一条系统命令，返回命令的标准输出。connection_id 由用户在 AI 助手上下文中选定。",
+		ShortDescription: "在 WebShell 连接上执行命令",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"connection_id": map[string]interface{}{
+					"type":        "string",
+					"description": "WebShell 连接 ID（如 ws_xxx）",
+				},
+				"command": map[string]interface{}{
+					"type":        "string",
+					"description": "要执行的系统命令",
+				},
+			},
+			"required": []string{"connection_id", "command"},
+		},
+	}
+	execHandler := func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		cid, _ := args["connection_id"].(string)
+		cmd, _ := args["command"].(string)
+		if cid == "" || cmd == "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "connection_id 和 command 均为必填"}}, IsError: true}, nil
+		}
+		conn, err := db.GetWebshellConnection(cid)
+		if err != nil || conn == nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "未找到该 WebShell 连接或查询失败"}}, IsError: true}, nil
+		}
+		output, ok, errMsg := webshellHandler.ExecWithConnection(conn, cmd)
+		if errMsg != "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: errMsg}}, IsError: true}, nil
+		}
+		if !ok {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "HTTP 非 200，输出:\n" + output}}, IsError: false}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: output}}, IsError: false}, nil
+	}
+	mcpServer.RegisterTool(execTool, execHandler)
+
+	// webshell_file_list
+	listTool := mcp.Tool{
+		Name:             builtin.ToolWebshellFileList,
+		Description:      "在指定 WebShell 连接上列出目录内容。path 默认为当前目录（.）。",
+		ShortDescription: "在 WebShell 上列出目录",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"connection_id": map[string]interface{}{"type": "string", "description": "WebShell 连接 ID"},
+				"path": map[string]interface{}{"type": "string", "description": "目录路径，默认 ."},
+			},
+			"required": []string{"connection_id"},
+		},
+	}
+	listHandler := func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		cid, _ := args["connection_id"].(string)
+		path, _ := args["path"].(string)
+		if cid == "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "connection_id 必填"}}, IsError: true}, nil
+		}
+		conn, err := db.GetWebshellConnection(cid)
+		if err != nil || conn == nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "未找到该 WebShell 连接"}}, IsError: true}, nil
+		}
+		output, ok, errMsg := webshellHandler.FileOpWithConnection(conn, "list", path, "", "")
+		if errMsg != "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: errMsg}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: output}}, IsError: !ok}, nil
+	}
+	mcpServer.RegisterTool(listTool, listHandler)
+
+	// webshell_file_read
+	readTool := mcp.Tool{
+		Name:             builtin.ToolWebshellFileRead,
+		Description:      "在指定 WebShell 连接上读取文件内容。",
+		ShortDescription: "在 WebShell 上读取文件",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"connection_id": map[string]interface{}{"type": "string", "description": "WebShell 连接 ID"},
+				"path": map[string]interface{}{"type": "string", "description": "文件路径"},
+			},
+			"required": []string{"connection_id", "path"},
+		},
+	}
+	readHandler := func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		cid, _ := args["connection_id"].(string)
+		path, _ := args["path"].(string)
+		if cid == "" || path == "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "connection_id 和 path 必填"}}, IsError: true}, nil
+		}
+		conn, err := db.GetWebshellConnection(cid)
+		if err != nil || conn == nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "未找到该 WebShell 连接"}}, IsError: true}, nil
+		}
+		output, ok, errMsg := webshellHandler.FileOpWithConnection(conn, "read", path, "", "")
+		if errMsg != "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: errMsg}}, IsError: true}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: output}}, IsError: !ok}, nil
+	}
+	mcpServer.RegisterTool(readTool, readHandler)
+
+	// webshell_file_write
+	writeTool := mcp.Tool{
+		Name:             builtin.ToolWebshellFileWrite,
+		Description:      "在指定 WebShell 连接上写入文件内容（会覆盖已有文件）。",
+		ShortDescription: "在 WebShell 上写入文件",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"connection_id": map[string]interface{}{"type": "string", "description": "WebShell 连接 ID"},
+				"path": map[string]interface{}{"type": "string", "description": "文件路径"},
+				"content": map[string]interface{}{"type": "string", "description": "要写入的内容"},
+			},
+			"required": []string{"connection_id", "path", "content"},
+		},
+	}
+	writeHandler := func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		cid, _ := args["connection_id"].(string)
+		path, _ := args["path"].(string)
+		content, _ := args["content"].(string)
+		if cid == "" || path == "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "connection_id 和 path 必填"}}, IsError: true}, nil
+		}
+		conn, err := db.GetWebshellConnection(cid)
+		if err != nil || conn == nil {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "未找到该 WebShell 连接"}}, IsError: true}, nil
+		}
+		output, ok, errMsg := webshellHandler.FileOpWithConnection(conn, "write", path, content, "")
+		if errMsg != "" {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: errMsg}}, IsError: true}, nil
+		}
+		if !ok {
+			return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "写入可能失败，输出:\n" + output}}, IsError: false}, nil
+		}
+		return &mcp.ToolResult{Content: []mcp.Content{{Type: "text", Text: "写入成功\n" + output}}, IsError: false}, nil
+	}
+	mcpServer.RegisterTool(writeTool, writeHandler)
+
+	logger.Info("WebShell 工具注册成功")
 }
 
 // initializeKnowledge 初始化知识库组件（用于动态初始化）

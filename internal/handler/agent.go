@@ -121,10 +121,11 @@ type ChatAttachment struct {
 
 // ChatRequest 聊天请求
 type ChatRequest struct {
-	Message        string            `json:"message" binding:"required"`
-	ConversationID string            `json:"conversationId,omitempty"`
-	Role           string            `json:"role,omitempty"` // 角色名称
-	Attachments    []ChatAttachment  `json:"attachments,omitempty"`
+	Message              string           `json:"message" binding:"required"`
+	ConversationID       string           `json:"conversationId,omitempty"`
+	Role                 string           `json:"role,omitempty"`                 // 角色名称
+	Attachments          []ChatAttachment  `json:"attachments,omitempty"`
+	WebShellConnectionID string           `json:"webshellConnectionId,omitempty"` // WebShell 管理 - AI 助手：当前选中的连接 ID，仅使用 webshell_* 工具
 }
 
 const (
@@ -316,7 +317,24 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 	finalMessage := req.Message
 	var roleTools []string // 角色配置的工具列表
 	var roleSkills []string // 角色配置的skills列表（用于提示AI，但不硬编码内容）
-	if req.Role != "" && req.Role != "默认" {
+
+	// WebShell AI 助手模式：绑定当前连接，仅开放 webshell_* 工具并注入 connection_id
+	if req.WebShellConnectionID != "" {
+		conn, err := h.db.GetWebshellConnection(strings.TrimSpace(req.WebShellConnectionID))
+		if err != nil || conn == nil {
+			h.logger.Warn("WebShell AI 助手：未找到连接", zap.String("id", req.WebShellConnectionID), zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"error": "未找到该 WebShell 连接"})
+			return
+		}
+		remark := conn.Remark
+		if remark == "" {
+			remark = conn.URL
+		}
+		finalMessage = fmt.Sprintf("[WebShell 助手上下文] 当前连接 ID：%s，备注：%s。可用工具（仅在该连接上操作时使用，connection_id 填 \"%s\"）：webshell_exec、webshell_file_list、webshell_file_read、webshell_file_write。请根据用户输入决定下一步：若仅为问候、闲聊或简单问题，直接简短回复即可，不必调用工具；当用户明确需要执行命令、列目录、读写字件等操作时再调用上述工具。\n\n用户请求：%s",
+			conn.ID, remark, conn.ID, req.Message)
+		roleTools = []string{builtin.ToolWebshellExec, builtin.ToolWebshellFileList, builtin.ToolWebshellFileRead, builtin.ToolWebshellFileWrite}
+		roleSkills = nil
+	} else if req.Role != "" && req.Role != "默认" {
 		if h.config.Roles != nil {
 			if role, exists := h.config.Roles[req.Role]; exists && role.Enabled {
 				// 应用用户提示词
@@ -712,11 +730,17 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		}
 	}
 
-	// 如果没有对话ID，创建新对话
+	// 如果没有对话ID，创建新对话（WebShell 助手模式下关联连接 ID 以便持久化展示）
 	conversationID := req.ConversationID
 	if conversationID == "" {
 		title := safeTruncateString(req.Message, 50)
-		conv, err := h.db.CreateConversation(title)
+		var conv *database.Conversation
+		var err error
+		if req.WebShellConnectionID != "" {
+			conv, err = h.db.CreateConversationWithWebshell(strings.TrimSpace(req.WebShellConnectionID), title)
+		} else {
+			conv, err = h.db.CreateConversation(title)
+		}
 		if err != nil {
 			h.logger.Error("创建对话失败", zap.Error(err))
 			sendEvent("error", "创建对话失败: "+err.Error(), nil)
@@ -769,7 +793,22 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	// 应用角色用户提示词和工具配置
 	finalMessage := req.Message
 	var roleTools []string // 角色配置的工具列表
-	if req.Role != "" && req.Role != "默认" {
+	var roleSkills []string
+	if req.WebShellConnectionID != "" {
+		conn, errConn := h.db.GetWebshellConnection(strings.TrimSpace(req.WebShellConnectionID))
+		if errConn != nil || conn == nil {
+			h.logger.Warn("WebShell AI 助手：未找到连接", zap.String("id", req.WebShellConnectionID), zap.Error(errConn))
+			sendEvent("error", "未找到该 WebShell 连接", nil)
+			return
+		}
+		remark := conn.Remark
+		if remark == "" {
+			remark = conn.URL
+		}
+		finalMessage = fmt.Sprintf("[WebShell 助手上下文] 当前连接 ID：%s，备注：%s。可用工具（仅在该连接上操作时使用，connection_id 填 \"%s\"）：webshell_exec、webshell_file_list、webshell_file_read、webshell_file_write。请根据用户输入决定下一步：若仅为问候、闲聊或简单问题，直接简短回复即可，不必调用工具；当用户明确需要执行命令、列目录、读写字件等操作时再调用上述工具。\n\n用户请求：%s",
+			conn.ID, remark, conn.ID, req.Message)
+		roleTools = []string{builtin.ToolWebshellExec, builtin.ToolWebshellFileList, builtin.ToolWebshellFileRead, builtin.ToolWebshellFileWrite}
+	} else if req.Role != "" && req.Role != "默认" {
 		if h.config.Roles != nil {
 			if role, exists := h.config.Roles[req.Role]; exists && role.Enabled {
 				// 应用用户提示词
@@ -788,6 +827,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 				}
 				// 注意：角色配置的skills不再硬编码注入，AI可以通过list_skills和read_skill工具按需调用
 				if len(role.Skills) > 0 {
+					roleSkills = role.Skills
 					h.logger.Info("角色配置了skills，AI可通过工具按需调用", zap.String("role", req.Role), zap.Int("skillCount", len(role.Skills)), zap.Strings("skills", role.Skills))
 				}
 			}
@@ -886,17 +926,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 
 	// 执行Agent Loop，传入独立的上下文，确保任务不会因客户端断开而中断（使用包含角色提示词的finalMessage和角色工具列表）
 	sendEvent("progress", "正在分析您的请求...", nil)
-	// 注意：skills不会硬编码注入，但会在系统提示词中提示AI这个角色推荐使用哪些skills
-	var roleSkills []string // 角色配置的skills列表（用于提示AI，但不硬编码内容）
-	if req.Role != "" && req.Role != "默认" {
-		if h.config.Roles != nil {
-			if role, exists := h.config.Roles[req.Role]; exists && role.Enabled {
-				if len(role.Skills) > 0 {
-					roleSkills = role.Skills
-				}
-			}
-		}
-	}
+	// 注意：roleSkills 已在上方根据 req.Role 或 WebShell 模式设置
 	result, err := h.agent.AgentLoopWithProgress(taskCtx, finalMessage, agentHistoryMessages, conversationID, progressCallback, roleTools, roleSkills)
 	if err != nil {
 		h.logger.Error("Agent Loop执行失败", zap.Error(err))

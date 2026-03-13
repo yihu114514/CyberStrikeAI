@@ -20,6 +20,11 @@ let webshellHistoryIndex = -1;
 const WEBSHELL_HISTORY_MAX = 100;
 // 清屏防重入：一次点击只执行一次（避免多次绑定或重复触发导致多个 shell>）
 let webshellClearInProgress = false;
+// AI 助手：按连接 ID 保存对话 ID，便于多轮对话
+let webshellAiConvMap = {};
+let webshellAiSending = false;
+// 流式打字机效果：当前会话的 response 序号，用于中止过期的打字
+let webshellStreamingTypingId = 0;
 
 // 从服务端（SQLite）拉取连接列表
 function getWebshellConnections() {
@@ -61,6 +66,10 @@ function wsT(key) {
         'webshell.editConnectionTitle': '编辑连接',
         'webshell.tabTerminal': '虚拟终端',
         'webshell.tabFileManager': '文件管理',
+        'webshell.tabAiAssistant': 'AI 助手',
+        'webshell.aiSystemReadyMessage': '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。',
+        'webshell.aiPlaceholder': '例如：列出当前目录下的文件',
+        'webshell.aiSend': '发送',
         'webshell.terminalWelcome': 'WebShell 虚拟终端 — 输入命令后按回车执行（Ctrl+L 清屏）',
         'webshell.quickCommands': '快捷命令',
         'webshell.downloadFile': '下载',
@@ -268,6 +277,95 @@ function escapeHtml(s) {
     return div.innerHTML;
 }
 
+function formatWebshellAiConvDate(updatedAt) {
+    if (!updatedAt) return '';
+    var d = typeof updatedAt === 'string' ? new Date(updatedAt) : updatedAt;
+    if (isNaN(d.getTime())) return '';
+    var now = new Date();
+    var sameDay = d.getDate() === now.getDate() && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    if (sameDay) return d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+    return (d.getMonth() + 1) + '/' + d.getDate();
+}
+
+function fetchAndRenderWebshellAiConvList(conn, listEl) {
+    if (!conn || !conn.id || !listEl || typeof apiFetch !== 'function') return Promise.resolve();
+    return apiFetch('/api/webshell/connections/' + encodeURIComponent(conn.id) + '/ai-conversations', { method: 'GET' })
+        .then(function (r) { return r.json(); })
+        .then(function (list) {
+            if (!Array.isArray(list)) list = [];
+            listEl.innerHTML = '';
+            list.forEach(function (item) {
+                var row = document.createElement('div');
+                row.className = 'webshell-ai-conv-item';
+                row.dataset.convId = item.id;
+                var title = (item.title || '').trim() || item.id.slice(0, 8);
+                var dateStr = item.updatedAt ? formatWebshellAiConvDate(item.updatedAt) : '';
+                row.innerHTML = '<span class="webshell-ai-conv-item-title">' + escapeHtml(title) + '</span><span class="webshell-ai-conv-item-date">' + escapeHtml(dateStr) + '</span>';
+                if (webshellAiConvMap[conn.id] === item.id) row.classList.add('active');
+                row.addEventListener('click', function () {
+                    webshellAiConvListSelect(conn, item.id, document.getElementById('webshell-ai-messages'), listEl);
+                });
+                var delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'btn-ghost btn-sm webshell-ai-conv-del';
+                delBtn.textContent = '×';
+                delBtn.title = wsT('webshell.aiDeleteConversation') || '删除对话';
+                delBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    if (!confirm(wsT('webshell.aiDeleteConversationConfirm') || '确定删除该对话？')) return;
+                    apiFetch('/api/conversations/' + encodeURIComponent(item.id), { method: 'DELETE' })
+                        .then(function (r) {
+                            if (r.ok) {
+                                if (webshellAiConvMap[conn.id] === item.id) {
+                                    delete webshellAiConvMap[conn.id];
+                                    var msgs = document.getElementById('webshell-ai-messages');
+                                    if (msgs) msgs.innerHTML = '';
+                                }
+                                fetchAndRenderWebshellAiConvList(conn, listEl);
+                            }
+                        })
+                        .catch(function (e) { console.warn('删除对话失败', e); });
+                });
+                row.appendChild(delBtn);
+                listEl.appendChild(row);
+            });
+        })
+        .catch(function (e) { console.warn('加载对话列表失败', e); });
+}
+
+function webshellAiConvListSelect(conn, convId, messagesContainer, listEl) {
+    if (!conn || !convId || !messagesContainer) return;
+    webshellAiConvMap[conn.id] = convId;
+    if (listEl) listEl.querySelectorAll('.webshell-ai-conv-item').forEach(function (el) {
+        el.classList.toggle('active', el.dataset.convId === convId);
+    });
+    if (typeof apiFetch !== 'function') return;
+    apiFetch('/api/conversations/' + encodeURIComponent(convId), { method: 'GET' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            messagesContainer.innerHTML = '';
+            var list = data.messages || [];
+            list.forEach(function (msg) {
+                var role = (msg.role || '').toLowerCase();
+                var content = (msg.content || '').trim();
+                if (!content && role !== 'assistant') return;
+                var div = document.createElement('div');
+                div.className = 'webshell-ai-msg ' + (role === 'user' ? 'user' : 'assistant');
+                div.textContent = content;
+                messagesContainer.appendChild(div);
+            });
+            if (list.length === 0) {
+                var readyMsg = wsT('webshell.aiSystemReadyMessage') || '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
+                var readyDiv = document.createElement('div');
+                readyDiv.className = 'webshell-ai-msg assistant';
+                readyDiv.textContent = readyMsg;
+                messagesContainer.appendChild(readyDiv);
+            }
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        })
+        .catch(function (e) { console.warn('加载对话失败', e); });
+}
+
 // 选择连接：渲染终端 + 文件管理 Tab，并初始化终端
 function selectWebshell(id) {
     currentWebshellId = id;
@@ -287,6 +385,7 @@ function selectWebshell(id) {
         '<div class="webshell-tabs">' +
         '<button type="button" class="webshell-tab active" data-tab="terminal">' + wsT('webshell.tabTerminal') + '</button>' +
         '<button type="button" class="webshell-tab" data-tab="file">' + wsT('webshell.tabFileManager') + '</button>' +
+        '<button type="button" class="webshell-tab" data-tab="ai">' + (wsT('webshell.tabAiAssistant') || 'AI 助手') + '</button>' +
         '</div>' +
         '<div id="webshell-pane-terminal" class="webshell-pane active">' +
         '<div class="webshell-terminal-toolbar">' +
@@ -321,6 +420,19 @@ function selectWebshell(id) {
         '<button type="button" class="btn-ghost" id="webshell-batch-download-btn">' + (wsT('webshell.batchDownload') || '批量下载') + '</button>' +
         '</div>' +
         '<div id="webshell-file-list" class="webshell-file-list"></div>' +
+        '</div>' +
+        '<div id="webshell-pane-ai" class="webshell-pane webshell-pane-ai-with-sidebar">' +
+        '<div class="webshell-ai-sidebar">' +
+        '<button type="button" class="btn-primary btn-sm webshell-ai-new-btn" id="webshell-ai-new-conv">' + (wsT('webshell.aiNewConversation') || '新对话') + '</button>' +
+        '<div class="webshell-ai-conv-list" id="webshell-ai-conv-list"></div>' +
+        '</div>' +
+        '<div class="webshell-ai-main">' +
+        '<div id="webshell-ai-messages" class="webshell-ai-messages"></div>' +
+        '<div class="webshell-ai-input-row">' +
+        '<textarea id="webshell-ai-input" class="webshell-ai-input form-control" rows="2" placeholder="' + (wsT('webshell.aiPlaceholder') || '例如：列出当前目录下的文件') + '"></textarea>' +
+        '<button type="button" class="btn-primary" id="webshell-ai-send">' + (wsT('webshell.aiSend') || '发送') + '</button>' +
+        '</div>' +
+        '</div>' +
         '</div>';
 
     // Tab 切换
@@ -376,7 +488,249 @@ function selectWebshell(id) {
     document.getElementById('webshell-batch-delete-btn').addEventListener('click', function () { webshellBatchDelete(webshellCurrentConn, pathInput); });
     document.getElementById('webshell-batch-download-btn').addEventListener('click', function () { webshellBatchDownload(webshellCurrentConn, pathInput); });
 
+    // AI 助手：侧边栏对话列表 + 主区消息
+    var aiInput = document.getElementById('webshell-ai-input');
+    var aiSendBtn = document.getElementById('webshell-ai-send');
+    var aiMessages = document.getElementById('webshell-ai-messages');
+    var aiNewConvBtn = document.getElementById('webshell-ai-new-conv');
+    var aiConvListEl = document.getElementById('webshell-ai-conv-list');
+
+    if (aiNewConvBtn) {
+        aiNewConvBtn.addEventListener('click', function () {
+            delete webshellAiConvMap[conn.id];
+            if (aiMessages) {
+                aiMessages.innerHTML = '';
+                var readyMsg = wsT('webshell.aiSystemReadyMessage') || '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
+                var div = document.createElement('div');
+                div.className = 'webshell-ai-msg assistant';
+                div.textContent = readyMsg;
+                aiMessages.appendChild(div);
+            }
+            if (aiConvListEl) aiConvListEl.querySelectorAll('.webshell-ai-conv-item').forEach(function (el) { el.classList.remove('active'); });
+        });
+    }
+    if (aiSendBtn && aiInput && aiMessages) {
+        aiSendBtn.addEventListener('click', function () { runWebshellAiSend(conn, aiInput, aiSendBtn, aiMessages); });
+        aiInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                runWebshellAiSend(conn, aiInput, aiSendBtn, aiMessages);
+            }
+        });
+        fetchAndRenderWebshellAiConvList(conn, aiConvListEl).then(function () {
+            loadWebshellAiHistory(conn, aiMessages).then(function () {
+                if (webshellAiConvMap[conn.id] && aiConvListEl) {
+                    aiConvListEl.querySelectorAll('.webshell-ai-conv-item').forEach(function (el) {
+                        el.classList.toggle('active', el.dataset.convId === webshellAiConvMap[conn.id]);
+                    });
+                }
+            });
+        });
+    }
+
     initWebshellTerminal(conn);
+}
+
+// 加载 WebShell 连接的 AI 助手对话历史（持久化展示），返回 Promise 供 .then 更新工具栏等
+function loadWebshellAiHistory(conn, messagesContainer) {
+    if (!conn || !conn.id || !messagesContainer) return Promise.resolve();
+    if (typeof apiFetch !== 'function') return Promise.resolve();
+    return apiFetch('/api/webshell/connections/' + encodeURIComponent(conn.id) + '/ai-history', { method: 'GET' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.conversationId) webshellAiConvMap[conn.id] = data.conversationId;
+            var list = Array.isArray(data.messages) ? data.messages : [];
+            list.forEach(function (msg) {
+                var role = (msg.role || '').toLowerCase();
+                var content = (msg.content || '').trim();
+                if (!content && role !== 'assistant') return;
+                var div = document.createElement('div');
+                div.className = 'webshell-ai-msg ' + (role === 'user' ? 'user' : 'assistant');
+                div.textContent = content;
+                messagesContainer.appendChild(div);
+            });
+            if (list.length === 0) {
+                var readyMsg = wsT('webshell.aiSystemReadyMessage') || '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
+                var readyDiv = document.createElement('div');
+                readyDiv.className = 'webshell-ai-msg assistant';
+                readyDiv.textContent = readyMsg;
+                messagesContainer.appendChild(readyDiv);
+            }
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        })
+        .catch(function (e) {
+            console.warn('加载 WebShell AI 历史失败', conn.id, e);
+        });
+}
+
+function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
+    if (!conn || !conn.id) return;
+    var message = (inputEl && inputEl.value || '').trim();
+    if (!message) return;
+    if (webshellAiSending) return;
+    if (typeof apiFetch !== 'function') {
+        if (messagesContainer) {
+            var errDiv = document.createElement('div');
+            errDiv.className = 'webshell-ai-msg assistant';
+            errDiv.textContent = '无法发送：未登录或 apiFetch 不可用';
+            messagesContainer.appendChild(errDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        return;
+    }
+
+    webshellAiSending = true;
+    if (sendBtn) sendBtn.disabled = true;
+
+    var userDiv = document.createElement('div');
+    userDiv.className = 'webshell-ai-msg user';
+    userDiv.textContent = message;
+    messagesContainer.appendChild(userDiv);
+
+    var timelineContainer = document.createElement('div');
+    timelineContainer.className = 'webshell-ai-timeline';
+    timelineContainer.setAttribute('aria-live', 'polite');
+
+    var assistantDiv = document.createElement('div');
+    assistantDiv.className = 'webshell-ai-msg assistant';
+    assistantDiv.textContent = '…';
+    messagesContainer.appendChild(timelineContainer);
+    messagesContainer.appendChild(assistantDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+    function appendTimelineItem(type, title, message) {
+        var item = document.createElement('div');
+        item.className = 'webshell-ai-timeline-item webshell-ai-timeline-' + type;
+        item.innerHTML = '<span class="webshell-ai-timeline-title">' + escapeHtml(title || message || '') + '</span>';
+        if (message && message !== title) item.innerHTML += '<div class="webshell-ai-timeline-msg">' + escapeHtml(message) + '</div>';
+        timelineContainer.appendChild(item);
+        timelineContainer.classList.add('has-items');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    if (inputEl) inputEl.value = '';
+
+    var convId = webshellAiConvMap[conn.id] || '';
+    var body = {
+        message: message,
+        webshellConnectionId: conn.id,
+        conversationId: convId
+    };
+
+    // 流式输出：支持 progress 实时更新、response 打字机效果；若后端发送多段 response 则追加
+    var streamingTarget = '';  // 当前要打字显示的目标全文（用于打字机效果）
+    var streamingTypingId = 0;  // 防重入，每次新 response 自增
+
+    apiFetch('/api/agent-loop/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    }).then(function (response) {
+        if (!response.ok) {
+            assistantDiv.textContent = '请求失败: ' + response.status;
+            return;
+        }
+        return response.body.getReader();
+    }).then(function (reader) {
+        if (!reader) return;
+        var decoder = new TextDecoder();
+        var buffer = '';
+        return reader.read().then(function processChunk(result) {
+            if (result.done) return;
+            buffer += decoder.decode(result.value, { stream: true });
+            var lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            for (var i = 0; i < lines.length; i++) {
+                var line = lines[i];
+                if (line.indexOf('data: ') !== 0) continue;
+                try {
+                    var eventData = JSON.parse(line.slice(6));
+                    if (eventData.type === 'conversation' && eventData.data && eventData.data.conversationId) {
+                        webshellAiConvMap[conn.id] = eventData.data.conversationId;
+                        var listEl = document.getElementById('webshell-ai-conv-list');
+                        if (listEl) fetchAndRenderWebshellAiConvList(conn, listEl).then(function () {
+                            listEl.querySelectorAll('.webshell-ai-conv-item').forEach(function (el) {
+                                el.classList.toggle('active', el.dataset.convId === eventData.data.conversationId);
+                            });
+                        });
+                    } else if (eventData.type === 'response') {
+                        var text = (eventData.message != null && eventData.message !== '') ? eventData.message : (eventData.data && typeof eventData.data === 'string' ? eventData.data : '');
+                        if (text) {
+                            streamingTarget += text;
+                            webshellStreamingTypingId += 1;
+                            streamingTypingId = webshellStreamingTypingId;
+                            runWebshellAiStreamingTyping(assistantDiv, streamingTarget, streamingTypingId, messagesContainer);
+                        }
+                    } else if (eventData.type === 'error' && eventData.message) {
+                        streamingTypingId += 1;
+                        appendTimelineItem('error', '❌ 错误', eventData.message);
+                        assistantDiv.textContent = '错误: ' + eventData.message;
+                    } else if (eventData.type === 'progress' && eventData.message) {
+                        appendTimelineItem('progress', '🔍 ' + eventData.message, '');
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'iteration') {
+                        var iterN = (eventData.data && eventData.data.iteration) || 0;
+                        var iterTitle = iterN ? '🔍 第 ' + iterN + ' 轮迭代' : ('🔍 ' + (eventData.message || '迭代'));
+                        appendTimelineItem('iteration', iterTitle, eventData.message || '');
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'thinking' && eventData.message) {
+                        appendTimelineItem('thinking', '🤔 AI 思考', eventData.message);
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'tool_calls_detected' && eventData.data) {
+                        var count = eventData.data.count || 0;
+                        appendTimelineItem('tool_calls_detected', '🔧 检测到 ' + count + ' 个工具调用', eventData.message || '');
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'tool_call' && eventData.data) {
+                        var d = eventData.data;
+                        var tn = d.toolName || '未知工具';
+                        var idx = d.index || 0;
+                        var total = d.total || 0;
+                        var title = '🔧 调用: ' + tn + (total ? ' (' + idx + '/' + total + ')' : '');
+                        appendTimelineItem('tool_call', title, eventData.message || '');
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'tool_result' && eventData.data) {
+                        var dr = eventData.data;
+                        var success = dr.success !== false;
+                        var tname = dr.toolName || '工具';
+                        var title = (success ? '✅ ' : '❌ ') + tname + (success ? ' 执行完成' : ' 执行失败');
+                        var sub = eventData.message || (dr.result ? String(dr.result).slice(0, 300) : '');
+                        appendTimelineItem('tool_result', title, sub);
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    }
+                } catch (e) { /* ignore parse error */ }
+            }
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            return reader.read().then(processChunk);
+        });
+    }).catch(function (err) {
+        assistantDiv.textContent = '请求异常: ' + (err && err.message ? err.message : String(err));
+    }).then(function () {
+        webshellAiSending = false;
+        if (sendBtn) sendBtn.disabled = false;
+        if (assistantDiv.textContent === '…' && !streamingTarget) assistantDiv.textContent = '无回复内容';
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    });
+}
+
+// 打字机效果：将 target 逐字/逐段写入 el，保证只生效于当前 id 的调用
+function runWebshellAiStreamingTyping(el, target, id, scrollContainer) {
+    if (!el || id === undefined) return;
+    var chunkSize = 3;
+    var delayMs = 24;
+    function tick() {
+        if (id !== webshellStreamingTypingId) return;
+        var cur = el.textContent || '';
+        if (cur.length >= target.length) {
+            el.textContent = target;
+            if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+            return;
+        }
+        var next = target.slice(0, cur.length + chunkSize);
+        el.textContent = next;
+        if (scrollContainer) scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        setTimeout(tick, delayMs);
+    }
+    if (el.textContent.length < target.length) setTimeout(tick, delayMs);
 }
 
 function getWebshellHistory(connId) {
@@ -1058,7 +1412,6 @@ function refreshWebshellUIOnLanguageChange() {
     if (page !== 'webshell') return;
 
     renderWebshellList();
-
     var workspace = document.getElementById('webshell-workspace');
     if (workspace) {
         if (!currentWebshellId || !webshellCurrentConn) {
@@ -1067,8 +1420,10 @@ function refreshWebshellUIOnLanguageChange() {
             // 只更新标签文案，不重建终端
             var tabTerminal = workspace.querySelector('.webshell-tab[data-tab="terminal"]');
             var tabFile = workspace.querySelector('.webshell-tab[data-tab="file"]');
+            var tabAi = workspace.querySelector('.webshell-tab[data-tab="ai"]');
             if (tabTerminal) tabTerminal.textContent = wsT('webshell.tabTerminal');
             if (tabFile) tabFile.textContent = wsT('webshell.tabFileManager');
+            if (tabAi) tabAi.textContent = wsT('webshell.tabAiAssistant') || 'AI 助手';
 
             var quickLabel = workspace.querySelector('.webshell-quick-label');
             if (quickLabel) quickLabel.textContent = (wsT('webshell.quickCommands') || '快捷命令') + ':';
@@ -1093,6 +1448,29 @@ function refreshWebshellUIOnLanguageChange() {
             if (batchDeleteBtn) batchDeleteBtn.textContent = wsT('webshell.batchDelete') || '批量删除';
             if (batchDownloadBtn) batchDownloadBtn.textContent = wsT('webshell.batchDownload') || '批量下载';
             if (filterInput) filterInput.placeholder = wsT('webshell.filterPlaceholder') || '过滤文件名';
+
+            // AI 助手区域文案：Tab 内按钮、占位符、系统就绪提示
+            var aiNewConvBtn = document.getElementById('webshell-ai-new-conv');
+            if (aiNewConvBtn) aiNewConvBtn.textContent = wsT('webshell.aiNewConversation') || '新对话';
+            var aiInput = document.getElementById('webshell-ai-input');
+            if (aiInput) aiInput.placeholder = wsT('webshell.aiPlaceholder') || '例如：列出当前目录下的文件';
+            var aiSendBtn = document.getElementById('webshell-ai-send');
+            if (aiSendBtn) aiSendBtn.textContent = wsT('webshell.aiSend') || '发送';
+
+            // 如果当前 AI 对话区只有系统就绪提示（没有用户消息），用当前语言重置这条提示
+            var aiMessages = document.getElementById('webshell-ai-messages');
+            if (aiMessages) {
+                var hasUserMsg = !!aiMessages.querySelector('.webshell-ai-msg.user');
+                var msgNodes = aiMessages.querySelectorAll('.webshell-ai-msg');
+                if (!hasUserMsg && msgNodes.length <= 1) {
+                    var readyMsg = wsT('webshell.aiSystemReadyMessage') || '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。';
+                    aiMessages.innerHTML = '';
+                    var readyDiv = document.createElement('div');
+                    readyDiv.className = 'webshell-ai-msg assistant';
+                    readyDiv.textContent = readyMsg;
+                    aiMessages.appendChild(readyDiv);
+                }
+            }
 
             var pathInput = document.getElementById('webshell-file-path');
             var fileListEl = document.getElementById('webshell-file-list');

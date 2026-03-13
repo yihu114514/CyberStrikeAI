@@ -13,6 +13,12 @@ const (
 	// Skills工具
 	ToolListSkills    = "list_skills"
 	ToolReadSkill     = "read_skill"
+
+	// WebShell 助手工具（AI 在 WebShell 管理 - AI 助手 中使用）
+	ToolWebshellExec       = "webshell_exec"
+	ToolWebshellFileList   = "webshell_file_list"
+	ToolWebshellFileRead   = "webshell_file_read"
+	ToolWebshellFileWrite  = "webshell_file_write"
 )
 
 // IsBuiltinTool 检查工具名称是否是内置工具
@@ -22,7 +28,11 @@ func IsBuiltinTool(toolName string) bool {
 		ToolListKnowledgeRiskTypes,
 		ToolSearchKnowledgeBase,
 		ToolListSkills,
-		ToolReadSkill:
+		ToolReadSkill,
+		ToolWebshellExec,
+		ToolWebshellFileList,
+		ToolWebshellFileRead,
+		ToolWebshellFileWrite:
 		return true
 	default:
 		return false
@@ -37,5 +47,9 @@ func GetAllBuiltinTools() []string {
 		ToolSearchKnowledgeBase,
 		ToolListSkills,
 		ToolReadSkill,
+		ToolWebshellExec,
+		ToolWebshellFileList,
+		ToolWebshellFileRead,
+		ToolWebshellFileWrite,
 	}
 }

@@ -197,6 +197,53 @@ func (h *WebShellHandler) DeleteConnection(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
+// GetAIHistory 获取指定 WebShell 连接的 AI 助手对话历史（GET /api/webshell/connections/:id/ai-history）
+func (h *WebShellHandler) GetAIHistory(c *gin.Context) {
+	if h.db == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
+		return
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+		return
+	}
+	conv, err := h.db.GetConversationByWebshellConnectionID(id)
+	if err != nil {
+		h.logger.Warn("获取 WebShell AI 对话失败", zap.String("connectionId", id), zap.Error(err))
+		c.JSON(http.StatusOK, gin.H{"conversationId": nil, "messages": []database.Message{}})
+		return
+	}
+	if conv == nil {
+		c.JSON(http.StatusOK, gin.H{"conversationId": nil, "messages": []database.Message{}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"conversationId": conv.ID, "messages": conv.Messages})
+}
+
+// ListAIConversations 列出该 WebShell 连接下的所有 AI 对话（供侧边栏）
+func (h *WebShellHandler) ListAIConversations(c *gin.Context) {
+	if h.db == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "database not available"})
+		return
+	}
+	id := strings.TrimSpace(c.Param("id"))
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+		return
+	}
+	list, err := h.db.ListConversationsByWebshellConnectionID(id)
+	if err != nil {
+		h.logger.Warn("列出 WebShell AI 对话失败", zap.String("connectionId", id), zap.Error(err))
+		c.JSON(http.StatusOK, []database.WebShellConversationItem{})
+		return
+	}
+	if list == nil {
+		list = []database.WebShellConversationItem{}
+	}
+	c.JSON(http.StatusOK, list)
+}
+
 // ExecRequest 执行命令请求（前端传入连接信息 + 命令）
 type ExecRequest struct {
 	URL      string `json:"url" binding:"required"`
@@ -471,4 +518,109 @@ func (h *WebShellHandler) escapePath(p string) string {
 func (h *WebShellHandler) escapeForEcho(s string) string {
 	// 仅用于 write：base64 写入更安全，这里简单用单引号包裹
 	return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'"
+}
+
+// ExecWithConnection 在指定 WebShell 连接上执行命令（供 MCP/Agent 等非 HTTP 调用）
+func (h *WebShellHandler) ExecWithConnection(conn *database.WebShellConnection, command string) (output string, ok bool, errMsg string) {
+	if conn == nil {
+		return "", false, "connection is nil"
+	}
+	command = strings.TrimSpace(command)
+	if command == "" {
+		return "", false, "command is required"
+	}
+	useGET := strings.ToUpper(strings.TrimSpace(conn.Method)) == "GET"
+	cmdParam := strings.TrimSpace(conn.CmdParam)
+	if cmdParam == "" {
+		cmdParam = "cmd"
+	}
+	var httpReq *http.Request
+	var err error
+	if useGET {
+		targetURL := h.buildExecURL(conn.URL, conn.Type, conn.Password, cmdParam, command)
+		httpReq, err = http.NewRequest(http.MethodGet, targetURL, nil)
+	} else {
+		body := h.buildExecBody(conn.Type, conn.Password, cmdParam, command)
+		httpReq, err = http.NewRequest(http.MethodPost, conn.URL, bytes.NewReader(body))
+		httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+	if err != nil {
+		return "", false, err.Error()
+	}
+	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CyberStrikeAI-WebShell/1.0)")
+	resp, err := h.client.Do(httpReq)
+	if err != nil {
+		return "", false, err.Error()
+	}
+	defer resp.Body.Close()
+	out, _ := io.ReadAll(resp.Body)
+	return string(out), resp.StatusCode == http.StatusOK, ""
+}
+
+// FileOpWithConnection 在指定 WebShell 连接上执行文件操作（供 MCP/Agent 调用），支持 list / read / write
+func (h *WebShellHandler) FileOpWithConnection(conn *database.WebShellConnection, action, path, content, targetPath string) (output string, ok bool, errMsg string) {
+	if conn == nil {
+		return "", false, "connection is nil"
+	}
+	action = strings.ToLower(strings.TrimSpace(action))
+	shellType := strings.ToLower(strings.TrimSpace(conn.Type))
+	if shellType == "" {
+		shellType = "php"
+	}
+	var command string
+	switch action {
+	case "list":
+		if path == "" {
+			path = "."
+		}
+		if shellType == "asp" || shellType == "aspx" {
+			command = "dir " + h.escapePath(strings.TrimSpace(path))
+		} else {
+			command = "ls -la " + h.escapePath(strings.TrimSpace(path))
+		}
+	case "read":
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return "", false, "path is required for read"
+		}
+		if shellType == "asp" || shellType == "aspx" {
+			command = "type " + h.escapePath(path)
+		} else {
+			command = "cat " + h.escapePath(path)
+		}
+	case "write":
+		path = strings.TrimSpace(path)
+		if path == "" {
+			return "", false, "path is required for write"
+		}
+		command = "echo " + h.escapeForEcho(content) + " > " + h.escapePath(path)
+	default:
+		return "", false, "unsupported action: " + action + " (supported: list, read, write)"
+	}
+	useGET := strings.ToUpper(strings.TrimSpace(conn.Method)) == "GET"
+	cmdParam := strings.TrimSpace(conn.CmdParam)
+	if cmdParam == "" {
+		cmdParam = "cmd"
+	}
+	var httpReq *http.Request
+	var err error
+	if useGET {
+		targetURL := h.buildExecURL(conn.URL, conn.Type, conn.Password, cmdParam, command)
+		httpReq, err = http.NewRequest(http.MethodGet, targetURL, nil)
+	} else {
+		body := h.buildExecBody(conn.Type, conn.Password, cmdParam, command)
+		httpReq, err = http.NewRequest(http.MethodPost, conn.URL, bytes.NewReader(body))
+		httpReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+	if err != nil {
+		return "", false, err.Error()
+	}
+	httpReq.Header.Set("User-Agent", "Mozilla/5.0 (compatible; CyberStrikeAI-WebShell/1.0)")
+	resp, err := h.client.Do(httpReq)
+	if err != nil {
+		return "", false, err.Error()
+	}
+	defer resp.Body.Close()
+	out, _ := io.ReadAll(resp.Body)
+	return string(out), resp.StatusCode == http.StatusOK, ""
 }

@@ -33,13 +33,26 @@ type Message struct {
 
 // CreateConversation 创建新对话
 func (db *DB) CreateConversation(title string) (*Conversation, error) {
+	return db.CreateConversationWithWebshell("", title)
+}
+
+// CreateConversationWithWebshell 创建新对话，可选绑定 WebShell 连接 ID（为空则普通对话）
+func (db *DB) CreateConversationWithWebshell(webshellConnectionID, title string) (*Conversation, error) {
 	id := uuid.New().String()
 	now := time.Now()
 
-	_, err := db.Exec(
-		"INSERT INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
-		id, title, now, now,
-	)
+	var err error
+	if webshellConnectionID != "" {
+		_, err = db.Exec(
+			"INSERT INTO conversations (id, title, created_at, updated_at, webshell_connection_id) VALUES (?, ?, ?, ?, ?)",
+			id, title, now, now, webshellConnectionID,
+		)
+	} else {
+		_, err = db.Exec(
+			"INSERT INTO conversations (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
+			id, title, now, now,
+		)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("创建对话失败: %w", err)
 	}
@@ -50,6 +63,86 @@ func (db *DB) CreateConversation(title string) (*Conversation, error) {
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
+}
+
+// GetConversationByWebshellConnectionID 根据 WebShell 连接 ID 获取该连接下最近一条对话（用于 AI 助手持久化）
+func (db *DB) GetConversationByWebshellConnectionID(connectionID string) (*Conversation, error) {
+	if connectionID == "" {
+		return nil, fmt.Errorf("connectionID is empty")
+	}
+	var conv Conversation
+	var createdAt, updatedAt string
+	var pinned int
+	err := db.QueryRow(
+		"SELECT id, title, pinned, created_at, updated_at FROM conversations WHERE webshell_connection_id = ? ORDER BY updated_at DESC LIMIT 1",
+		connectionID,
+	).Scan(&conv.ID, &conv.Title, &pinned, &createdAt, &updatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("查询对话失败: %w", err)
+	}
+	conv.Pinned = pinned != 0
+	if t, e := time.Parse("2006-01-02 15:04:05.999999999-07:00", createdAt); e == nil {
+		conv.CreatedAt = t
+	} else if t, e := time.Parse("2006-01-02 15:04:05", createdAt); e == nil {
+		conv.CreatedAt = t
+	} else {
+		conv.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
+	}
+	if t, e := time.Parse("2006-01-02 15:04:05.999999999-07:00", updatedAt); e == nil {
+		conv.UpdatedAt = t
+	} else if t, e := time.Parse("2006-01-02 15:04:05", updatedAt); e == nil {
+		conv.UpdatedAt = t
+	} else {
+		conv.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+	}
+	messages, err := db.GetMessages(conv.ID)
+	if err != nil {
+		return nil, fmt.Errorf("加载消息失败: %w", err)
+	}
+	conv.Messages = messages
+	return &conv, nil
+}
+
+// WebShellConversationItem 用于侧边栏列表，不含消息
+type WebShellConversationItem struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// ListConversationsByWebshellConnectionID 列出该 WebShell 连接下的所有对话（按更新时间倒序），供侧边栏展示
+func (db *DB) ListConversationsByWebshellConnectionID(connectionID string) ([]WebShellConversationItem, error) {
+	if connectionID == "" {
+		return nil, nil
+	}
+	rows, err := db.Query(
+		"SELECT id, title, updated_at FROM conversations WHERE webshell_connection_id = ? ORDER BY updated_at DESC",
+		connectionID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("查询对话列表失败: %w", err)
+	}
+	defer rows.Close()
+	var list []WebShellConversationItem
+	for rows.Next() {
+		var item WebShellConversationItem
+		var updatedAt string
+		if err := rows.Scan(&item.ID, &item.Title, &updatedAt); err != nil {
+			continue
+		}
+		if t, e := time.Parse("2006-01-02 15:04:05.999999999-07:00", updatedAt); e == nil {
+			item.UpdatedAt = t
+		} else if t, e := time.Parse("2006-01-02 15:04:05", updatedAt); e == nil {
+			item.UpdatedAt = t
+		} else {
+			item.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
+		}
+		list = append(list, item)
+	}
+	return list, rows.Err()
 }
 
 // GetConversation 获取对话

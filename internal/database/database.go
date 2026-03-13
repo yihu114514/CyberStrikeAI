@@ -415,6 +415,21 @@ func (db *DB) migrateConversationsTable() error {
 		}
 	}
 
+	// 检查 webshell_connection_id 字段是否存在（WebShell AI 助手对话关联）
+	err = db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('conversations') WHERE name='webshell_connection_id'").Scan(&count)
+	if err != nil {
+		if _, addErr := db.Exec("ALTER TABLE conversations ADD COLUMN webshell_connection_id TEXT"); addErr != nil {
+			errMsg := strings.ToLower(addErr.Error())
+			if !strings.Contains(errMsg, "duplicate column") && !strings.Contains(errMsg, "already exists") {
+				db.logger.Warn("添加webshell_connection_id字段失败", zap.Error(addErr))
+			}
+		}
+	} else if count == 0 {
+		if _, err := db.Exec("ALTER TABLE conversations ADD COLUMN webshell_connection_id TEXT"); err != nil {
+			db.logger.Warn("添加webshell_connection_id字段失败", zap.Error(err))
+		}
+	}
+
 	return nil
 }
 
