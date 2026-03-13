@@ -64,6 +64,14 @@ CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集
 <img src="./images/role-management.png" alt="角色管理" width="100%">
 </td>
 </tr>
+<tr>
+<td width="33.33%" align="center">
+<strong>WebShell 管理</strong><br/>
+<img src="./images/webshell-management.png" alt="WebShell 管理" width="100%">
+</td>
+<td width="33.33%" align="center"></td>
+<td width="33.33%" align="center"></td>
+</tr>
 </table>
 
 </div>
@@ -83,6 +91,7 @@ CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集
 - 🎭 角色化测试：预设安全测试角色（渗透测试、CTF、Web 应用扫描等），支持自定义提示词和工具限制
 - 🎯 Skills 技能系统：20+ 预设安全测试技能（SQL 注入、XSS、API 安全等），可附加到角色或由 AI 按需调用
 - 📱 **机器人**：支持钉钉、飞书长连接，在手机端与 CyberStrikeAI 对话（配置与命令详见 [机器人使用说明](docs/robot.md)）
+- 🐚 **WebShell 管理**：添加与管理 WebShell 连接（兼容冰蝎/蚁剑等），通过虚拟终端执行命令、内置文件管理进行文件操作，并提供按连接维度保存历史的 AI 助手标签页；支持 PHP/ASP/ASPX/JSP 及自定义类型，可配置请求方法与命令参数。
 
 ## 工具概览
 
@@ -168,6 +177,7 @@ go build -o cyberstrike-ai cmd/server/main.go
 - **对话分组**：将对话按项目或主题组织到不同分组，支持置顶、重命名、删除等操作，所有数据持久化存储。
 - **漏洞管理**：在测试过程中创建、更新和跟踪发现的漏洞。支持按严重程度（严重/高/中/低/信息）、状态（待确认/已确认/已修复/误报）和对话进行过滤，查看统计信息并导出发现。
 - **批量任务管理**：创建任务队列，批量添加多个任务，执行前可编辑或删除任务，然后依次顺序执行。每个任务会作为独立对话执行，支持完整的状态跟踪（待执行/执行中/已完成/失败/已取消）和执行历史。
+- **WebShell 管理**：添加并管理 WebShell 连接（PHP/ASP/ASPX/JSP 或自定义类型）。使用虚拟终端执行命令（带命令历史与快捷命令），使用文件管理浏览、读取、编辑、上传与删除目标文件，并支持按路径导航和名称过滤。连接信息持久化存储于 SQLite，支持 GET/POST 及可配置命令参数（兼容冰蝎/蚁剑等）。
 - **可视化配置**：在界面中切换模型、启停工具、设置迭代次数等。
 
 ### 默认安全措施
@@ -232,6 +242,14 @@ go build -o cyberstrike-ai cmd/server/main.go
 ### 攻击链分析
 - 智能体解析每次对话，抽取目标、工具、漏洞与因果关系。
 - Web 端可交互式查看链路节点、风险级别及时间轴，支持导出报告。
+
+### WebShell 管理
+- **连接管理**：在 Web 界面进入 **WebShell 管理**，可添加、编辑或删除 WebShell 连接。每条连接包含：Shell 地址、密码/密钥、Shell 类型（PHP/ASP/ASPX/JSP/自定义）、请求方式（GET/POST）、命令参数名（默认 `cmd`）、备注等信息，并持久化存储在 SQLite，兼容冰蝎、蚁剑等常见客户端。
+- **虚拟终端**：选择连接后，在 **虚拟终端** 标签页中执行任意命令，支持命令历史与常用快捷命令（whoami/id/ls/pwd 等），输出在浏览器中实时显示，支持 Ctrl+L 清屏。
+- **文件管理**：在 **文件管理** 标签页中可列出目录、读取/编辑文件、删除文件、新建文件/目录、上传文件（大文件分片上传）、重命名路径以及下载勾选文件，并支持面包屑导航与名称过滤。
+- **AI 助手**：在 **AI 助手** 标签页中与智能体对话，由系统自动结合当前 WebShell 连接执行工具与命令，侧边栏展示该连接下的所有历史会话，支持多轮追踪与查看。
+- **连通性测试**：使用 **测试连通性** 可在执行命令前通过一次 `echo 1` 调用校验 Shell 地址、密码与命令参数是否正确。
+- **持久化**：所有 WebShell 连接与相关 AI 会话均保存在 SQLite（与对话共用数据库），服务重启后仍可继续使用。
 
 ### MCP 全场景
 - **Web 模式**：自带 HTTP MCP 服务供前端调用。
@@ -388,6 +406,7 @@ CyberStrikeAI 支持通过三种传输模式连接外部 MCP 服务器：
 - **角色管理 API**：通过 `/api/roles` 端点管理安全测试角色：`GET /api/roles`（列表）、`GET /api/roles/:name`（获取角色）、`POST /api/roles`（创建角色）、`PUT /api/roles/:name`（更新角色）、`DELETE /api/roles/:name`（删除角色）。角色以 YAML 文件形式存储在 `roles/` 目录，支持热加载。
 - **漏洞管理 API**：通过 `/api/vulnerabilities` 端点管理漏洞：`GET /api/vulnerabilities`（列表，支持过滤）、`POST /api/vulnerabilities`（创建）、`GET /api/vulnerabilities/:id`（获取）、`PUT /api/vulnerabilities/:id`（更新）、`DELETE /api/vulnerabilities/:id`（删除）、`GET /api/vulnerabilities/stats`（统计）。
 - **批量任务 API**：通过 `/api/batch-tasks` 端点管理批量任务队列：`POST /api/batch-tasks`（创建队列）、`GET /api/batch-tasks`（列表）、`GET /api/batch-tasks/:queueId`（获取队列）、`POST /api/batch-tasks/:queueId/start`（开始执行）、`POST /api/batch-tasks/:queueId/cancel`（取消）、`DELETE /api/batch-tasks/:queueId`（删除队列）、`POST /api/batch-tasks/:queueId/tasks`（添加任务）、`PUT /api/batch-tasks/:queueId/tasks/:taskId`（更新任务）、`DELETE /api/batch-tasks/:queueId/tasks/:taskId`（删除任务）。任务依次顺序执行，每个任务创建独立对话，支持完整状态跟踪。
+- **WebShell API**：通过 `/api/webshell/connections`（GET 列表、POST 创建、PUT 更新、DELETE 删除）及 `/api/webshell/exec`（执行命令）、`/api/webshell/fileop`（列出/读取/写入/删除文件）管理 WebShell 连接与执行操作。
 - **任务控制**：支持暂停/终止长任务、修改参数后重跑、流式获取日志。
 - **安全管理**：`/api/auth/change-password` 可即时轮换口令；建议在暴露 MCP 端口时配合网络层 ACL。
 
