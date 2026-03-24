@@ -9670,6 +9670,112 @@ header {
     flex-direction: column;
     min-height: 0;
 }
+.webshell-pane-memo {
+    padding: 14px;
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.55) 0%, rgba(241, 245, 249, 0.28) 100%);
+}
+.webshell-memo-layout {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.9) 100%);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    overflow: hidden;
+}
+.webshell-memo-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(6px);
+}
+.webshell-memo-input {
+    flex: 1;
+    min-height: 0;
+    margin: 12px 14px 8px;
+    padding: 12px 13px;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    background: #fff;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    font-family: "JetBrains Mono", "Fira Code", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    color: var(--text-primary);
+    resize: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.webshell-memo-input:focus {
+    border-color: rgba(37, 99, 235, 0.5);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    outline: none;
+}
+.webshell-memo-status {
+    margin: 0 14px 12px auto;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    color: var(--text-secondary);
+    background: rgba(148, 163, 184, 0.14);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+}
+.webshell-memo-status.error {
+    color: #b91c1c;
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.28);
+}
+.webshell-ai-memo {
+    flex-shrink: 0;
+    width: 300px;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    min-height: 0;
+}
+.webshell-ai-memo-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+}
+.webshell-ai-memo-input {
+    flex: 1;
+    min-height: 0;
+    margin: 10px 12px 8px;
+    resize: none;
+}
+.webshell-ai-memo-status {
+    padding: 0 12px 10px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+.webshell-ai-memo-status.error {
+    color: #dc2626;
+}
+@media (max-width: 1280px) {
+    .webshell-ai-memo {
+        width: 260px;
+    }
+}
+@media (max-width: 980px) {
+    .webshell-ai-memo {
+        display: none;
+    }
+}
 .webshell-ai-hint {
     flex-shrink: 0;
     padding: 10px 14px;

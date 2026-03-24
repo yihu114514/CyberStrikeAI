@@ -99,6 +99,7 @@ function wsT(key) {
         'webshell.tabFileManager': '文件管理',
         'webshell.tabAiAssistant': 'AI 助手',
         'webshell.tabDbManager': '数据库管理',
+        'webshell.tabMemo': '备忘录',
         'webshell.dbType': '数据库类型',
         'webshell.dbHost': '主机',
         'webshell.dbPort': '端口',
@@ -135,6 +136,11 @@ function wsT(key) {
         'webshell.aiSystemReadyMessage': '系统已就绪。请输入您的测试需求，系统将自动执行相应的安全测试。',
         'webshell.aiPlaceholder': '例如：列出当前目录下的文件',
         'webshell.aiSend': '发送',
+        'webshell.aiMemo': '备忘录',
+        'webshell.aiMemoPlaceholder': '记录关键命令、测试思路、复现步骤...',
+        'webshell.aiMemoClear': '清空',
+        'webshell.aiMemoSaving': '保存中...',
+        'webshell.aiMemoSaved': '已保存到本地',
         'webshell.terminalWelcome': 'WebShell 虚拟终端 — 输入命令后按回车执行（Ctrl+L 清屏）',
         'webshell.quickCommands': '快捷命令',
         'webshell.downloadFile': '下载',
@@ -802,7 +808,9 @@ function normalizeWebshellDbState(rawState) {
     if (!profiles.some(function (p) { return p.id === activeProfileId; })) {
         activeProfileId = profiles[0].id;
     }
-    return { profiles: profiles, activeProfileId: activeProfileId };
+    var aiMemo = typeof state.aiMemo === 'string' ? state.aiMemo : '';
+    if (aiMemo.length > 100000) aiMemo = aiMemo.slice(0, 100000);
+    return { profiles: profiles, activeProfileId: activeProfileId, aiMemo: aiMemo };
 }
 
 function getWebshellDbState(conn) {
@@ -835,6 +843,18 @@ function saveWebshellDbConfig(conn, cfg) {
     if (idx < 0) idx = 0;
     state.profiles[idx] = Object.assign({}, state.profiles[idx], cfg);
     state.activeProfileId = state.profiles[idx].id;
+    saveWebshellDbState(conn, state);
+}
+
+function getWebshellAiMemo(conn) {
+    var state = getWebshellDbState(conn);
+    return typeof state.aiMemo === 'string' ? state.aiMemo : '';
+}
+
+function saveWebshellAiMemo(conn, text) {
+    var state = getWebshellDbState(conn);
+    state.aiMemo = String(text || '');
+    if (state.aiMemo.length > 100000) state.aiMemo = state.aiMemo.slice(0, 100000);
     saveWebshellDbState(conn, state);
 }
 
@@ -1230,6 +1250,17 @@ function renderWebshellAiErrorMessage(targetEl, rawMessage) {
     }
 }
 
+function isLikelyWebshellAiErrorMessage(content, msg) {
+    var text = String(content || '').trim();
+    if (!text) return false;
+    var lower = text.toLowerCase();
+    if (/^(执行失败|请求失败|请求异常|error)\s*[:：]/i.test(text)) return true;
+    if (/(status code\s*:\s*4\d{2}|unauthorized|forbidden|apikey|api key|invalid api key)/i.test(lower)) return true;
+    if (/(noderunerror|tool[-_ ]?error|agent[-_ ]?error|执行失败)/i.test(lower)) return true;
+    var details = msg && Array.isArray(msg.processDetails) ? msg.processDetails : [];
+    return details.some(function (d) { return String((d && d.eventType) || '').toLowerCase() === 'error'; });
+}
+
 function formatWebshellAiConvDate(updatedAt) {
     if (!updatedAt) return '';
     var d = typeof updatedAt === 'string' ? new Date(updatedAt) : updatedAt;
@@ -1404,7 +1435,9 @@ function webshellAiConvListSelect(conn, convId, messagesContainer, listEl) {
                 if (role === 'user') {
                     div.textContent = content;
                 } else {
-                    if (typeof formatMarkdown === 'function') {
+                    if (isLikelyWebshellAiErrorMessage(content, msg)) {
+                        renderWebshellAiErrorMessage(div, content);
+                    } else if (typeof formatMarkdown === 'function') {
                         div.innerHTML = formatMarkdown(content);
                     } else {
                         div.textContent = content;
@@ -1455,6 +1488,7 @@ function selectWebshell(id, stateReady) {
         '<button type="button" class="webshell-tab" data-tab="file">' + wsT('webshell.tabFileManager') + '</button>' +
         '<button type="button" class="webshell-tab" data-tab="db">' + (wsT('webshell.tabDbManager') || '数据库管理') + '</button>' +
         '<button type="button" class="webshell-tab" data-tab="ai">' + (wsT('webshell.tabAiAssistant') || 'AI 助手') + '</button>' +
+        '<button type="button" class="webshell-tab" data-tab="memo">' + (wsT('webshell.tabMemo') || '备忘录') + '</button>' +
         '</div>' +
         '<div id="webshell-pane-terminal" class="webshell-pane active">' +
         '<div class="webshell-terminal-toolbar">' +
@@ -1522,6 +1556,13 @@ function selectWebshell(id, stateReady) {
         '<textarea id="webshell-ai-input" class="webshell-ai-input form-control" rows="2" placeholder="' + (wsT('webshell.aiPlaceholder') || '例如：列出当前目录下的文件') + '"></textarea>' +
         '<button type="button" class="btn-primary" id="webshell-ai-send">' + (wsT('webshell.aiSend') || '发送') + '</button>' +
         '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div id="webshell-pane-memo" class="webshell-pane webshell-pane-memo">' +
+        '<div class="webshell-memo-layout">' +
+        '<div class="webshell-memo-head"><span>' + (wsT('webshell.aiMemo') || '备忘录') + '</span><button type="button" class="btn-ghost btn-sm" id="webshell-ai-memo-clear">' + (wsT('webshell.aiMemoClear') || '清空') + '</button></div>' +
+        '<textarea id="webshell-ai-memo-input" class="webshell-memo-input form-control" rows="18" placeholder="' + (wsT('webshell.aiMemoPlaceholder') || '记录关键命令、测试思路、复现步骤...') + '"></textarea>' +
+        '<div id="webshell-ai-memo-status" class="webshell-memo-status">' + (wsT('webshell.aiMemoSaved') || '已保存到本地') + '</div>' +
         '</div>' +
         '</div>' +
         '<div id="webshell-pane-db" class="webshell-pane webshell-pane-db">' +
@@ -1640,6 +1681,50 @@ function selectWebshell(id, stateReady) {
     var aiMessages = document.getElementById('webshell-ai-messages');
     var aiNewConvBtn = document.getElementById('webshell-ai-new-conv');
     var aiConvListEl = document.getElementById('webshell-ai-conv-list');
+    var aiMemoInput = document.getElementById('webshell-ai-memo-input');
+    var aiMemoStatus = document.getElementById('webshell-ai-memo-status');
+    var aiMemoClearBtn = document.getElementById('webshell-ai-memo-clear');
+    var aiMemoSaveTimer = null;
+
+    function setWebshellAiMemoStatus(text, isError) {
+        if (!aiMemoStatus) return;
+        aiMemoStatus.textContent = text || '';
+        aiMemoStatus.classList.toggle('error', !!isError);
+    }
+
+    function flushWebshellAiMemo() {
+        if (!aiMemoInput) return;
+        saveWebshellAiMemo(conn, aiMemoInput.value || '');
+        setWebshellAiMemoStatus(wsT('webshell.aiMemoSaved') || '已保存到本地', false);
+    }
+
+    if (aiMemoInput) {
+        aiMemoInput.value = getWebshellAiMemo(conn);
+        setWebshellAiMemoStatus(wsT('webshell.aiMemoSaved') || '已保存到本地', false);
+        aiMemoInput.addEventListener('input', function () {
+            setWebshellAiMemoStatus(wsT('webshell.aiMemoSaving') || '保存中...', false);
+            if (aiMemoSaveTimer) clearTimeout(aiMemoSaveTimer);
+            aiMemoSaveTimer = setTimeout(function () {
+                aiMemoSaveTimer = null;
+                flushWebshellAiMemo();
+            }, 500);
+        });
+        aiMemoInput.addEventListener('blur', function () {
+            if (aiMemoSaveTimer) {
+                clearTimeout(aiMemoSaveTimer);
+                aiMemoSaveTimer = null;
+            }
+            flushWebshellAiMemo();
+        });
+    }
+
+    if (aiMemoClearBtn && aiMemoInput) {
+        aiMemoClearBtn.addEventListener('click', function () {
+            aiMemoInput.value = '';
+            flushWebshellAiMemo();
+            aiMemoInput.focus();
+        });
+    }
 
     if (aiNewConvBtn) {
         aiNewConvBtn.addEventListener('click', function () {
@@ -2154,7 +2239,9 @@ function loadWebshellAiHistory(conn, messagesContainer) {
                 if (role === 'user') {
                     div.textContent = content;
                 } else {
-                    if (typeof formatMarkdown === 'function') {
+                    if (isLikelyWebshellAiErrorMessage(content, msg)) {
+                        renderWebshellAiErrorMessage(div, content);
+                    } else if (typeof formatMarkdown === 'function') {
                         div.innerHTML = formatMarkdown(content);
                     } else {
                         div.textContent = content;
@@ -3548,10 +3635,12 @@ function refreshWebshellUIOnLanguageChange() {
             var tabFile = workspace.querySelector('.webshell-tab[data-tab="file"]');
             var tabAi = workspace.querySelector('.webshell-tab[data-tab="ai"]');
             var tabDb = workspace.querySelector('.webshell-tab[data-tab="db"]');
+            var tabMemo = workspace.querySelector('.webshell-tab[data-tab="memo"]');
             if (tabTerminal) tabTerminal.textContent = wsT('webshell.tabTerminal');
             if (tabFile) tabFile.textContent = wsT('webshell.tabFileManager');
             if (tabAi) tabAi.textContent = wsT('webshell.tabAiAssistant') || 'AI 助手';
             if (tabDb) tabDb.textContent = wsT('webshell.tabDbManager') || '数据库管理';
+            if (tabMemo) tabMemo.textContent = wsT('webshell.tabMemo') || '备忘录';
 
             var quickLabel = workspace.querySelector('.webshell-quick-label');
             if (quickLabel) quickLabel.textContent = (wsT('webshell.quickCommands') || '快捷命令') + ':';
@@ -3596,6 +3685,18 @@ function refreshWebshellUIOnLanguageChange() {
             if (aiInput) aiInput.placeholder = wsT('webshell.aiPlaceholder') || '例如：列出当前目录下的文件';
             var aiSendBtn = document.getElementById('webshell-ai-send');
             if (aiSendBtn) aiSendBtn.textContent = wsT('webshell.aiSend') || '发送';
+            var aiMemoTitle = document.querySelector('.webshell-memo-head span');
+            if (aiMemoTitle) aiMemoTitle.textContent = wsT('webshell.aiMemo') || '备忘录';
+            var aiMemoClearBtn = document.getElementById('webshell-ai-memo-clear');
+            if (aiMemoClearBtn) aiMemoClearBtn.textContent = wsT('webshell.aiMemoClear') || '清空';
+            var aiMemoInput = document.getElementById('webshell-ai-memo-input');
+            if (aiMemoInput) aiMemoInput.placeholder = wsT('webshell.aiMemoPlaceholder') || '记录关键命令、测试思路、复现步骤...';
+            var aiMemoStatus = document.getElementById('webshell-ai-memo-status');
+            if (aiMemoStatus && !aiMemoStatus.classList.contains('error')) {
+                var savingText = wsT('webshell.aiMemoSaving') || '保存中...';
+                var savedText = wsT('webshell.aiMemoSaved') || '已保存到本地';
+                aiMemoStatus.textContent = aiMemoStatus.textContent === savingText ? savingText : savedText;
+            }
             var dbTypeLabel = document.querySelector('#webshell-db-type') ? document.querySelector('#webshell-db-type').closest('label') : null;
             if (dbTypeLabel && dbTypeLabel.querySelector('span')) dbTypeLabel.querySelector('span').textContent = wsT('webshell.dbType') || '数据库类型';
             var dbHostLabel = document.querySelector('#webshell-db-host') ? document.querySelector('#webshell-db-host').closest('label') : null;
