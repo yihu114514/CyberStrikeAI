@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"cyberstrike-ai/internal/multiagent"
@@ -49,6 +50,8 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 	var baseCtx context.Context
 
 	clientDisconnected := false
+	// 与 sseKeepalive 共用：禁止并发写 ResponseWriter，否则会破坏 chunked 编码（ERR_INVALID_CHUNKED_ENCODING）。
+	var sseWriteMu sync.Mutex
 	sendEvent := func(eventType, message string, data interface{}) {
 		if clientDisconnected {
 			return
@@ -66,7 +69,10 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		}
 		ev := StreamEvent{Type: eventType, Message: message, Data: data}
 		b, _ := json.Marshal(ev)
-		if _, err := fmt.Fprintf(c.Writer, "data: %s\n\n", b); err != nil {
+		sseWriteMu.Lock()
+		_, err := fmt.Fprintf(c.Writer, "data: %s\n\n", b)
+		if err != nil {
+			sseWriteMu.Unlock()
 			clientDisconnected = true
 			return
 		}
@@ -75,6 +81,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		} else {
 			c.Writer.Flush()
 		}
+		sseWriteMu.Unlock()
 	}
 
 	h.logger.Info("收到 Eino DeepAgent 流式请求",
@@ -130,7 +137,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 	})
 
 	stopKeepalive := make(chan struct{})
-	go sseKeepalive(c, stopKeepalive)
+	go sseKeepalive(c, stopKeepalive, &sseWriteMu)
 	defer close(stopKeepalive)
 
 	result, runErr := multiagent.RunDeepAgent(

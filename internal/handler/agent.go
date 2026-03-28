@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -776,6 +777,8 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	// 发送初始事件
 	// 用于跟踪客户端是否已断开连接
 	clientDisconnected := false
+	// 与 sseKeepalive 共用：禁止并发写 ResponseWriter，否则会破坏 chunked 编码（ERR_INVALID_CHUNKED_ENCODING）。
+	var sseWriteMu sync.Mutex
 	// 用于快速确认模型是否真的产生了流式 delta
 	var responseDeltaCount int
 	var responseStartLogged bool
@@ -843,19 +846,20 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		}
 		eventJSON, _ := json.Marshal(event)
 
-		// 尝试写入事件，如果失败则标记客户端断开
-		if _, err := fmt.Fprintf(c.Writer, "data: %s\n\n", eventJSON); err != nil {
+		sseWriteMu.Lock()
+		_, err := fmt.Fprintf(c.Writer, "data: %s\n\n", eventJSON)
+		if err != nil {
+			sseWriteMu.Unlock()
 			clientDisconnected = true
 			h.logger.Debug("客户端断开连接，停止发送SSE事件", zap.Error(err))
 			return
 		}
-
-		// 刷新响应，如果失败则标记客户端断开
 		if flusher, ok := c.Writer.(http.Flusher); ok {
 			flusher.Flush()
 		} else {
 			c.Writer.Flush()
 		}
+		sseWriteMu.Unlock()
 	}
 
 	// 如果没有对话ID，创建新对话（WebShell 助手模式下关联连接 ID 以便持久化展示）
@@ -1066,7 +1070,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	sendEvent("progress", "正在分析您的请求...", nil)
 	// 注意：roleSkills 已在上方根据 req.Role 或 WebShell 模式设置
 	stopKeepalive := make(chan struct{})
-	go sseKeepalive(c, stopKeepalive)
+	go sseKeepalive(c, stopKeepalive, &sseWriteMu)
 	defer close(stopKeepalive)
 
 	result, err := h.agent.AgentLoopWithProgress(taskCtx, finalMessage, agentHistoryMessages, conversationID, progressCallback, roleTools, roleSkills)
