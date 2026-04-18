@@ -609,6 +609,9 @@ func setupRoutes(
 		protected.POST("/agent-loop", agentHandler.AgentLoop)
 		// Agent Loop 流式输出
 		protected.POST("/agent-loop/stream", agentHandler.AgentLoopStream)
+		// Eino ADK 单代理（ChatModelAgent + Runner；不依赖 multi_agent.enabled）
+		protected.POST("/eino-agent", agentHandler.EinoSingleAgentLoop)
+		protected.POST("/eino-agent/stream", agentHandler.EinoSingleAgentLoopStream)
 		// Agent Loop 取消与任务列表
 		protected.POST("/agent-loop/cancel", agentHandler.CancelAgentLoop)
 		protected.GET("/agent-loop/tasks", agentHandler.ListAgentTasks)
