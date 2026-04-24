@@ -399,6 +399,23 @@ if (typeof window !== 'undefined') {
     window.updateHitlStatusUI = updateHitlStatusUI;
 }
 
+function toggleHitlSidebarCard() {
+    var card = document.getElementById('hitl-sidebar-card');
+    if (!card) return;
+    card.classList.toggle('hitl-sidebar-collapsed');
+    try {
+        localStorage.setItem('hitl-sidebar-collapsed', card.classList.contains('hitl-sidebar-collapsed') ? '1' : '0');
+    } catch (e) {}
+}
+window.toggleHitlSidebarCard = toggleHitlSidebarCard;
+
+document.addEventListener('DOMContentLoaded', function () {
+    var card = document.getElementById('hitl-sidebar-card');
+    if (card && localStorage.getItem('hitl-sidebar-collapsed') === '0') {
+        card.classList.remove('hitl-sidebar-collapsed');
+    }
+});
+
 function getAgentModeLabelForValue(mode) {
     if (typeof window.t === 'function') {
         switch (mode) {

@@ -964,7 +964,33 @@ header {
     align-items: flex-start;
     justify-content: space-between;
     gap: 10px;
-    margin-bottom: 10px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.hitl-sidebar-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.hitl-sidebar-body {
+    overflow: hidden;
+    max-height: 500px;
+    opacity: 1;
+    margin-top: 10px;
+    transition: max-height 0.3s ease, opacity 0.2s ease, margin-top 0.3s ease;
+}
+
+.hitl-sidebar-collapsed .hitl-sidebar-body {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+}
+
+.hitl-sidebar-collapsed .hitl-apply-btn {
+    display: none;
 }
 
 .hitl-sidebar-heading {
