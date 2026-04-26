@@ -765,50 +765,59 @@ async function sendMessage() {
         if (!response.ok) {
             throw new Error('请求失败: ' + response.status);
         }
-        
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop(); // 保留最后一个不完整的行
-            
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const eventData = JSON.parse(line.slice(6));
-                        handleStreamEvent(eventData, progressElement, progressId, 
-                                         () => assistantMessageId, (id) => { assistantMessageId = id; },
-                                         () => mcpExecutionIds, (ids) => { mcpExecutionIds = ids; });
-                    } catch (e) {
-                        console.error('解析事件数据失败:', e, line);
+
+        window.__csAgentLiveStream = {
+            active: true,
+            conversationId: currentConversationId || null,
+            progressId: progressId
+        };
+        try {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // 保留最后一个不完整的行
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const eventData = JSON.parse(line.slice(6));
+                            handleStreamEvent(eventData, progressElement, progressId,
+                                             () => assistantMessageId, (id) => { assistantMessageId = id; },
+                                             () => mcpExecutionIds, (ids) => { mcpExecutionIds = ids; });
+                        } catch (e) {
+                            console.error('解析事件数据失败:', e, line);
+                        }
                     }
                 }
             }
-        }
-        
-        // 处理剩余的buffer
-        if (buffer.trim()) {
-            const lines = buffer.split('\n');
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const eventData = JSON.parse(line.slice(6));
-                        handleStreamEvent(eventData, progressElement, progressId,
-                                         () => assistantMessageId, (id) => { assistantMessageId = id; },
-                                         () => mcpExecutionIds, (ids) => { mcpExecutionIds = ids; });
-                    } catch (e) {
-                        console.error('解析事件数据失败:', e, line);
+
+            // 处理剩余的buffer
+            if (buffer.trim()) {
+                const lines = buffer.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const eventData = JSON.parse(line.slice(6));
+                            handleStreamEvent(eventData, progressElement, progressId,
+                                             () => assistantMessageId, (id) => { assistantMessageId = id; },
+                                             () => mcpExecutionIds, (ids) => { mcpExecutionIds = ids; });
+                        } catch (e) {
+                            console.error('解析事件数据失败:', e, line);
+                        }
                     }
                 }
             }
+        } finally {
+            window.__csAgentLiveStream = { active: false, conversationId: null, progressId: null };
         }
-        
+
         // 消息发送成功后，再次确保草稿被清除
         clearChatDraft();
         try {
@@ -2921,6 +2930,22 @@ async function loadConversation(conversationId) {
             if (currentConversationId === conversationId && typeof window.restoreHitlInlineForConversation === 'function') {
                 await window.restoreHitlInlineForConversation(conversationId);
             }
+        }
+
+        // 页面刷新后主流式连接会中断；若该会话仍在后端运行，自动挂载 task-events 补流继续更新前端迭代进度。
+        const skipReplay = typeof window.shouldSkipTaskEventReplayAttach === 'function'
+            && window.shouldSkipTaskEventReplayAttach(conversationId);
+        if (
+            seq === loadConversationRequestSeq &&
+            currentConversationId === conversationId &&
+            typeof window.attachRunningTaskEventStream === 'function' &&
+            !skipReplay
+        ) {
+            Promise.resolve()
+                .then(() => window.attachRunningTaskEventStream(conversationId))
+                .catch((e) => {
+                    console.warn('attachRunningTaskEventStream on loadConversation failed', e);
+                });
         }
     } catch (error) {
         console.error('加载对话失败:', error);
