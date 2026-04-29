@@ -12760,7 +12760,7 @@ header {
 .dashboard-kpi-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 20px;
+    gap: 16px;
     margin-bottom: 24px;
 }
 
@@ -12775,12 +12775,16 @@ header {
 .dashboard-kpi-card {
     background: #fff;
     border-radius: 14px;
-    padding: 22px;
+    padding: 18px 20px;
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.25s ease;
     border: 1px solid rgba(0,0,0,0.06);
     box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
     position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 116px;
 }
 
 .dashboard-kpi-card:nth-child(1) { background: linear-gradient(145deg, #fff 0%, #f0f9ff 100%); }
@@ -12794,11 +12798,33 @@ header {
     border-color: rgba(0, 102, 255, 0.2);
 }
 
+.dashboard-kpi-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dashboard-kpi-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dashboard-kpi-icon-tasks { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+.dashboard-kpi-icon-vuln { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+.dashboard-kpi-icon-calls { background: rgba(34, 197, 94, 0.1); color: #22c55e; }
+.dashboard-kpi-icon-rate { background: rgba(20, 184, 166, 0.1); color: #14b8a6; }
+
 .dashboard-kpi-value {
     font-size: 1.875rem;
     font-weight: 800;
     color: var(--text-primary);
-    line-height: 1.2;
+    line-height: 1.1;
     letter-spacing: -0.03em;
     font-variant-numeric: tabular-nums;
 }
@@ -12811,8 +12837,494 @@ header {
 .dashboard-kpi-label {
     font-size: 0.8125rem;
     color: var(--text-secondary);
-    margin-top: 8px;
     font-weight: 500;
+}
+
+/* KPI 副标：徽章 + 文本，承载次级信息（严重漏洞数 / 待执行 / 工具数 / 健康度） */
+.dashboard-kpi-sub {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-height: 22px;
+    margin-top: 2px;
+}
+
+.dashboard-kpi-sub-text {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.dashboard-kpi-sub-text.is-pending { color: #ca8a04; }
+.dashboard-kpi-sub-text.is-running { color: #2563eb; }
+.dashboard-kpi-sub-text.is-idle    { color: #94a3b8; }
+.dashboard-kpi-sub-text.is-success { color: #15803d; }
+.dashboard-kpi-sub-text.is-warning { color: #ca8a04; }
+.dashboard-kpi-sub-text.is-danger  { color: #dc2626; }
+
+.dashboard-kpi-sub-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-kpi-sub-badge[hidden] { display: none; }
+
+.dashboard-kpi-sub-badge-critical {
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+}
+
+.dashboard-kpi-sub-badge .dashboard-kpi-sub-badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.85;
+}
+
+/* 「上次更新」徽章 */
+.dashboard-last-updated {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.03);
+    transition: background 0.2s, color 0.3s;
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-last-updated.is-flash {
+    background: rgba(34, 197, 94, 0.12);
+    color: #15803d;
+    animation: dashboard-last-flash 1.4s ease-out 1;
+}
+
+@keyframes dashboard-last-flash {
+    0% { background: rgba(34, 197, 94, 0.22); }
+    100% { background: rgba(0, 0, 0, 0.03); }
+}
+
+.dashboard-last-updated-icon {
+    flex-shrink: 0;
+}
+
+.dashboard-last-updated-time {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* 关键提醒条 */
+.dashboard-alert-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    margin-bottom: 18px;
+    background: linear-gradient(135deg, #fff5f5 0%, #fee2e2 100%);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #7f1d1d;
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.08);
+    animation: dashboard-alert-slide-in 0.3s ease-out;
+}
+
+@keyframes dashboard-alert-slide-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.dashboard-alert-banner[hidden] { display: none; }
+
+.dashboard-alert-banner.is-warning {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-color: rgba(245, 158, 11, 0.3);
+    color: #78350f;
+}
+
+.dashboard-alert-banner.is-danger {
+    background: linear-gradient(135deg, #fff5f5 0%, #fee2e2 100%);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #7f1d1d;
+}
+
+.dashboard-alert-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.7);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dashboard-alert-banner.is-danger .dashboard-alert-icon { color: #dc2626; }
+.dashboard-alert-banner.is-warning .dashboard-alert-icon { color: #d97706; }
+
+.dashboard-alert-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.dashboard-alert-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 2px;
+}
+
+.dashboard-alert-desc {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    opacity: 0.92;
+}
+
+.dashboard-alert-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.dashboard-alert-btn {
+    appearance: none;
+    border: 1px solid currentColor;
+    background: rgba(255, 255, 255, 0.85);
+    color: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s;
+    white-space: nowrap;
+}
+
+.dashboard-alert-btn:hover {
+    background: #fff;
+    transform: translateY(-1px);
+}
+
+.dashboard-alert-btn-secondary {
+    background: transparent;
+    border-color: rgba(0, 0, 0, 0.15);
+    color: inherit;
+    opacity: 0.85;
+}
+
+/* 告警条「× 忽略」按钮：低权重，hover 时才显形 */
+.dashboard-alert-close {
+    appearance: none;
+    background: transparent;
+    border: none;
+    color: inherit;
+    opacity: 0.45;
+    cursor: pointer;
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: opacity 0.15s, background 0.15s;
+}
+
+.dashboard-alert-close:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+/* 「上次更新」过期状态：变灰 + ⚠️ 图标显形 */
+.dashboard-last-updated.is-stale {
+    background: rgba(245, 158, 11, 0.08);
+    color: #92400e;
+    border-color: rgba(245, 158, 11, 0.25);
+}
+
+.dashboard-last-updated-stale {
+    display: inline-flex;
+    align-items: center;
+    color: #d97706;
+    margin-left: 4px;
+}
+
+.dashboard-last-updated-stale[hidden] { display: none; }
+
+/* 推荐操作 section：紧急 / 警告 / 配置 三类，颜色区分但不喧宾夺主 */
+.dashboard-section-recommend[hidden] { display: none; }
+
+.dashboard-section-hint {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    font-weight: 400;
+    margin-left: auto;
+}
+
+.dashboard-recommend-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.dashboard-recommend-item {
+    display: grid;
+    grid-template-columns: 36px 1fr auto;
+    align-items: center;
+    column-gap: 12px;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    text-decoration: none;
+    color: inherit;
+}
+
+.dashboard-recommend-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.12);
+}
+
+.dashboard-recommend-item:focus-visible {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
+
+.dashboard-recommend-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dashboard-recommend-item.lvl-urgent .dashboard-recommend-icon {
+    background: #fee2e2;
+    color: #dc2626;
+}
+.dashboard-recommend-item.lvl-warning .dashboard-recommend-icon {
+    background: #fef3c7;
+    color: #d97706;
+}
+.dashboard-recommend-item.lvl-setup .dashboard-recommend-icon {
+    background: #dbeafe;
+    color: #2563eb;
+}
+
+/* 紧急推荐：左侧加红条强调 */
+.dashboard-recommend-item.lvl-urgent {
+    border-left: 3px solid #ef4444;
+}
+
+.dashboard-recommend-body {
+    min-width: 0;
+}
+
+.dashboard-recommend-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-recommend-desc {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    margin-top: 2px;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-recommend-arrow {
+    color: var(--text-tertiary, #9ca3af);
+    font-size: 1.125rem;
+    font-weight: 400;
+    transition: transform 0.15s, color 0.15s;
+}
+
+.dashboard-recommend-item:hover .dashboard-recommend-arrow {
+    color: #6366f1;
+    transform: translateX(2px);
+}
+
+/* 最近事件 section：列表风格，按 p0/p1/p2 着色 */
+.dashboard-section-events[hidden] { display: none; }
+
+.dashboard-events-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.dashboard-event-item {
+    display: grid;
+    grid-template-columns: 8px 1fr auto;
+    align-items: center;
+    column-gap: 12px;
+    padding: 10px 12px;
+    background: #fff;
+}
+
+.dashboard-event-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #9ca3af;
+    flex-shrink: 0;
+}
+
+.dashboard-event-item.lvl-p0 .dashboard-event-dot { background: #ef4444; }
+.dashboard-event-item.lvl-p1 .dashboard-event-dot { background: #f59e0b; }
+.dashboard-event-item.lvl-p2 .dashboard-event-dot { background: #6b7280; }
+
+.dashboard-event-body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.dashboard-event-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-event-msg {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #6b7280);
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-event-time {
+    font-size: 0.6875rem;
+    color: var(--text-tertiary, #9ca3af);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* External MCP 健康度：能力总览中专门一行的 N/N + 状态徽章 */
+.dashboard-resource-icon-external {
+    background: #eef2ff;
+    color: #4f46e5;
+}
+
+.dashboard-resource-health {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary, #6b7280);
+}
+
+.dashboard-resource-health.is-ok {
+    background: rgba(16, 185, 129, 0.1);
+    color: #047857;
+}
+
+.dashboard-resource-health.is-warning {
+    background: rgba(245, 158, 11, 0.12);
+    color: #b45309;
+}
+
+.dashboard-resource-health.is-danger {
+    background: rgba(239, 68, 68, 0.12);
+    color: #b91c1c;
+}
+
+/* 升级版「最近漏洞」空状态：图标 + 标题 + 描述 + 行动按钮 */
+.dashboard-recent-vulns-empty.is-rich {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 16px;
+    text-align: center;
+    gap: 8px;
+}
+
+.dashboard-empty-icon {
+    color: #c7d2fe;
+    margin-bottom: 4px;
+}
+
+.dashboard-empty-title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text-primary, #111827);
+}
+
+.dashboard-empty-desc {
+    font-size: 0.8125rem;
+    color: var(--text-secondary, #6b7280);
+    line-height: 1.4;
+    max-width: 420px;
+}
+
+.dashboard-empty-action {
+    appearance: none;
+    border: 1px solid #6366f1;
+    background: #6366f1;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background 0.15s, transform 0.15s;
+}
+
+.dashboard-empty-action:hover {
+    background: #4f46e5;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 720px) {
+    .dashboard-alert-banner {
+        flex-wrap: wrap;
+    }
+    .dashboard-alert-actions {
+        width: 100%;
+    }
+    .dashboard-recommend-list {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* 两列主内容网格 */
@@ -12865,6 +13377,261 @@ header {
     padding-bottom: 10px;
     border-bottom: 2px solid #f1f5f9;
     letter-spacing: -0.01em;
+}
+
+/* 章节标题 + 「查看全部」链接横排（标题不再单独占下边框） */
+.dashboard-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f1f5f9;
+}
+
+.dashboard-section-header .dashboard-section-title {
+    margin: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.dashboard-section-link {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s, transform 0.15s;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.dashboard-section-link:hover {
+    color: #0066ff;
+    transform: translateX(2px);
+}
+
+/* 最近漏洞列表 */
+.dashboard-recent-vulns {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-height: 60px;
+}
+
+.dashboard-recent-vulns-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 28px 12px;
+    font-size: 0.875rem;
+    background: #fafbfc;
+    border-radius: 10px;
+    border: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+.dashboard-recent-vuln-item {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1.6fr) minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 14px;
+    padding: 12px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+    text-decoration: none;
+    color: inherit;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.dashboard-recent-vuln-item:last-child {
+    border-bottom: none;
+}
+
+.dashboard-recent-vuln-item:hover {
+    background: rgba(0, 102, 255, 0.04);
+}
+
+.dashboard-recent-vuln-item:focus-visible {
+    outline: 2px solid rgba(0, 102, 255, 0.5);
+    outline-offset: 2px;
+}
+
+.dashboard-recent-vuln-sev {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    width: fit-content;
+}
+
+.dashboard-recent-vuln-sev.sev-critical { background: rgba(239, 68, 68, 0.12); color: #b91c1c; }
+.dashboard-recent-vuln-sev.sev-high     { background: rgba(249, 115, 22, 0.12); color: #c2410c; }
+.dashboard-recent-vuln-sev.sev-medium   { background: rgba(234, 179, 8, 0.15);  color: #a16207; }
+.dashboard-recent-vuln-sev.sev-low      { background: rgba(20, 184, 166, 0.12); color: #0f766e; }
+.dashboard-recent-vuln-sev.sev-info     { background: rgba(59, 130, 246, 0.12); color: #1d4ed8; }
+
+.dashboard-recent-vuln-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dashboard-recent-vuln-target {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+.dashboard-recent-vuln-time {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 状态药丸：和处置状态卡片用同一套语义色，但采用更克制的尺寸 */
+.dashboard-recent-vuln-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+    border: 1px solid transparent;
+}
+
+.dashboard-recent-vuln-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.85;
+}
+
+.dashboard-recent-vuln-status.st-open {
+    background: rgba(239, 68, 68, 0.08);
+    color: #b91c1c;
+    border-color: rgba(239, 68, 68, 0.18);
+}
+
+.dashboard-recent-vuln-status.st-confirmed {
+    background: rgba(245, 158, 11, 0.10);
+    color: #b45309;
+    border-color: rgba(245, 158, 11, 0.20);
+}
+
+.dashboard-recent-vuln-status.st-fixed {
+    background: rgba(34, 197, 94, 0.10);
+    color: #15803d;
+    border-color: rgba(34, 197, 94, 0.20);
+}
+
+.dashboard-recent-vuln-status.st-fp {
+    background: rgba(148, 163, 184, 0.16);
+    color: #475569;
+    border-color: rgba(148, 163, 184, 0.25);
+}
+
+@media (max-width: 720px) {
+    .dashboard-recent-vuln-item {
+        grid-template-columns: 56px minmax(0, 1fr) auto auto;
+    }
+    .dashboard-recent-vuln-target { display: none; }
+}
+
+@media (max-width: 480px) {
+    .dashboard-recent-vuln-item {
+        grid-template-columns: 56px minmax(0, 1fr) auto;
+    }
+    .dashboard-recent-vuln-time { display: none; }
+}
+
+/* 能力总览 - 侧栏列表 */
+.dashboard-resource-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.dashboard-resource-item {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 4px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+/* External MCP 行可能在没配置时隐藏，display:grid 会覆盖 [hidden] 默认行为，需补一条 */
+.dashboard-resource-item[hidden] { display: none; }
+
+.dashboard-resource-item:last-child {
+    border-bottom: none;
+}
+
+.dashboard-resource-item:hover {
+    background: rgba(0, 102, 255, 0.04);
+}
+
+.dashboard-resource-item:focus-visible {
+    outline: 2px solid rgba(0, 102, 255, 0.5);
+    outline-offset: 2px;
+}
+
+.dashboard-resource-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dashboard-resource-icon-mcp        { background: rgba(99, 102, 241, 0.1);  color: #6366f1; }
+.dashboard-resource-icon-skills     { background: rgba(168, 85, 247, 0.1);  color: #a855f7; }
+.dashboard-resource-icon-knowledge  { background: rgba(34, 197, 94, 0.1);   color: #22c55e; }
+.dashboard-resource-icon-roles      { background: rgba(245, 158, 11, 0.1);  color: #f59e0b; }
+.dashboard-resource-icon-agents     { background: rgba(20, 184, 166, 0.1);  color: #14b8a6; }
+/* WebShell 用偏暗的青蓝色，跟"终端 / shell"语义对得上，又跟其他几个色相区分 */
+.dashboard-resource-icon-webshell   { background: rgba(8, 145, 178, 0.1);   color: #0e7490; }
+
+.dashboard-resource-label {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dashboard-resource-value {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    min-width: 1.5em;
+    text-align: right;
 }
 
 .dashboard-overview-list {
@@ -13184,91 +13951,358 @@ header {
     }
 }
 
-.dashboard-chart-wrap {
+/* 漏洞严重程度分布：半环形图（浅色风格） */
+.dashboard-severity-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
+    gap: 32px;
+    align-items: center;
+}
+
+@media (max-width: 820px) {
+    .dashboard-severity-wrap {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 20px;
+    }
+}
+
+.dashboard-severity-chart {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    aspect-ratio: 480 / 260;
+}
+
+.dashboard-severity-donut {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
+}
+
+.dashboard-severity-donut .donut-track {
+    fill: #f1f5f9;
+}
+
+.dashboard-severity-donut .donut-segment {
+    /* 段与段之间用白色描边制造“切割线”效果，与参考图二一致；
+       环回到黄金比例（厚度 50）后，描边也用回 4，切割线感更强 */
+    stroke: #ffffff;
+    stroke-width: 4;
+    stroke-linejoin: round;
+    transition: opacity 0.2s ease;
+    cursor: default;
+}
+
+.dashboard-severity-donut .donut-segment.is-empty {
+    display: none;
+}
+
+.dashboard-severity-donut .donut-label-text {
+    font-size: 14px;
+    font-weight: 700;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+.dashboard-severity-donut .donut-label-text .donut-label-pct {
+    font-weight: 500;
+    font-size: 11px;
+    fill: var(--text-secondary, #6b7280);
+}
+
+.dashboard-severity-donut .donut-label-text .donut-label-name {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.dashboard-severity-donut .donut-label-text.label-critical { fill: #ef4444; }
+.dashboard-severity-donut .donut-label-text.label-high { fill: #f97316; }
+.dashboard-severity-donut .donut-label-text.label-medium { fill: #eab308; }
+.dashboard-severity-donut .donut-label-text.label-low { fill: #14b8a6; }
+.dashboard-severity-donut .donut-label-text.label-info { fill: #3b82f6; }
+
+/* 半环形配色：保持原有浅色基调（红→橙→黄→青→蓝） */
+.dashboard-severity-donut .donut-segment.seg-critical { fill: #f87171; }
+.dashboard-severity-donut .donut-segment.seg-high { fill: #fb923c; }
+.dashboard-severity-donut .donut-segment.seg-medium { fill: #facc15; }
+.dashboard-severity-donut .donut-segment.seg-low { fill: #2dd4bf; }
+.dashboard-severity-donut .donut-segment.seg-info { fill: #60a5fa; }
+
+.dashboard-severity-center {
+    position: absolute;
+    left: 50%;
+    /* cy 在 viewBox(0,0,480,260) 中是 215，约 83% 处；
+       这里把中心文字放在内圈靠下、靠近直径线的位置，让数字看起来"坐"在半圆里。 */
+    top: 76%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    width: 60%;
+}
+
+.dashboard-severity-center-value {
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text-primary);
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-severity-center-label {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    margin-top: 8px;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+}
+
+@media (max-width: 720px) {
+    .dashboard-severity-center-value { font-size: 2.25rem; }
+    .dashboard-severity-center-label { font-size: 0.75rem; }
+}
+
+.dashboard-severity-legend {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 2px;
+    align-self: center;
 }
 
-.dashboard-stacked-bar {
-    display: flex;
-    width: 100%;
-    height: 28px;
-    border-radius: 14px;
-    overflow: hidden;
-    background: #f1f5f9;
-}
-
-.dashboard-bar-seg {
-    height: 100%;
-    min-width: 2px;
-    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 0.92;
-    border-right: 1px solid rgba(241, 245, 249, 0.9);
-    box-sizing: border-box;
-}
-
-.dashboard-bar-seg:first-child {
-    border-radius: 14px 0 0 14px;
-}
-
-.dashboard-bar-seg:last-child {
-    border-right: none;
-    border-radius: 0 14px 14px 0;
-}
-
-/* 严重→信息：柔和连续色阶，红→橙→黄→绿→蓝，无灰沉感 */
-.dashboard-bar-seg.seg-critical { background: linear-gradient(90deg, #f87171, #fca5a5); }
-.dashboard-bar-seg.seg-high { background: linear-gradient(90deg, #fb923c, #fdba74); }
-.dashboard-bar-seg.seg-medium { background: linear-gradient(90deg, #facc15, #fde047); }
-.dashboard-bar-seg.seg-low { background: linear-gradient(90deg, #34d399, #6ee7b7); }
-.dashboard-bar-seg.seg-info { background: linear-gradient(90deg, #60a5fa, #93c5fd); }
-
-.dashboard-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px 32px;
+.dashboard-severity-legend-item {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) 2.5em 3em;
+    column-gap: 14px;
     align-items: center;
+    padding: 10px 4px;
+    font-size: 0.9375rem;
+    border-bottom: 1px solid transparent;
+    transition: background 0.2s, border-color 0.2s;
+    border-radius: 4px;
 }
 
-.dashboard-legend-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.875rem;
-    padding: 6px 12px;
-    background: #f8fafc;
-    border-radius: 20px;
-    transition: background 0.2s;
+.dashboard-severity-legend-item:hover {
+    background: rgba(0, 0, 0, 0.025);
 }
 
-.dashboard-legend-item:hover {
-    background: #f1f5f9;
-}
-
-.dashboard-legend-dot {
+.dashboard-severity-legend-dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
     flex-shrink: 0;
-    box-shadow: 0 0 0 2px rgba(255,255,255,0.8);
 }
 
-/* 与条形图同色系，图例与条形视觉一致 */
-.dashboard-legend-dot.critical { background: #f87171; }
-.dashboard-legend-dot.high { background: #fb923c; }
-.dashboard-legend-dot.medium { background: #facc15; }
-.dashboard-legend-dot.low { background: #34d399; }
-.dashboard-legend-dot.info { background: #60a5fa; }
+.dashboard-severity-legend-dot.critical { background: #f87171; }
+.dashboard-severity-legend-dot.high { background: #fb923c; }
+.dashboard-severity-legend-dot.medium { background: #facc15; }
+.dashboard-severity-legend-dot.low { background: #2dd4bf; }
+.dashboard-severity-legend-dot.info { background: #60a5fa; }
 
-.dashboard-legend-label {
+.dashboard-severity-legend-label {
+    color: var(--text-primary);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dashboard-severity-legend-value {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.dashboard-severity-legend-pct {
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+/* 漏洞处置状态 + 修复进度（占据 donut 下方留白） */
+.dashboard-severity-status {
+    grid-column: 1 / -1;
+    padding-top: 18px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.08);
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    gap: 24px;
+    align-items: center;
+}
+
+@media (max-width: 980px) {
+    .dashboard-severity-status {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
+}
+
+.dashboard-severity-status-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+@media (max-width: 480px) {
+    .dashboard-severity-status-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.dashboard-severity-status-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #fafbfc;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    text-decoration: none;
+    color: inherit;
+    min-width: 0;
+}
+
+.dashboard-severity-status-cell:hover {
+    transform: translateY(-1px);
+    border-color: rgba(0, 102, 255, 0.18);
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+.dashboard-severity-status-cell:focus-visible {
+    outline: 2px solid rgba(0, 102, 255, 0.5);
+    outline-offset: 2px;
+}
+
+.dashboard-severity-status-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.dashboard-severity-status-cell.s-open .dashboard-severity-status-icon       { background: rgba(239, 68, 68, 0.10);  color: #dc2626; }
+.dashboard-severity-status-cell.s-confirmed .dashboard-severity-status-icon  { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+.dashboard-severity-status-cell.s-fixed .dashboard-severity-status-icon      { background: rgba(34, 197, 94, 0.12);  color: #16a34a; }
+.dashboard-severity-status-cell.s-fp .dashboard-severity-status-icon         { background: rgba(148, 163, 184, 0.18); color: #64748b; }
+
+.dashboard-severity-status-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+    min-width: 0;
+}
+
+.dashboard-severity-status-value {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.dashboard-severity-status-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-severity-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dashboard-severity-progress-meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dashboard-severity-progress-title {
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.dashboard-severity-progress-value {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+}
+
+.dashboard-severity-progress-value > span:first-child {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: #16a34a;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+}
+
+.dashboard-severity-progress-detail {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-severity-progress-track {
+    display: flex;
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: #f1f5f9;
+    overflow: hidden;
+}
+
+.dashboard-severity-progress-fixed {
+    background: linear-gradient(90deg, #4ade80 0%, #16a34a 100%);
+    transition: width 0.4s ease;
+}
+
+.dashboard-severity-progress-confirmed {
+    background: linear-gradient(90deg, #fbbf24 0%, #f59e0b 100%);
+    transition: width 0.4s ease;
+}
+
+.dashboard-severity-progress-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 0.6875rem;
     color: var(--text-secondary);
 }
 
-.dashboard-legend-value {
-    font-weight: 700;
-    color: var(--text-primary);
-    min-width: 1.5em;
+.dashboard-severity-progress-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.dashboard-severity-progress-legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    display: inline-block;
+}
+
+.dashboard-severity-progress-legend-dot.legend-fixed     { background: #16a34a; }
+.dashboard-severity-progress-legend-dot.legend-confirmed { background: #f59e0b; }
+.dashboard-severity-progress-legend-dot.legend-open      { background: #f1f5f9; border: 1px solid #cbd5e1; }
+
+@media (prefers-reduced-motion: reduce) {
+    .dashboard-severity-status-cell { transition: none; }
+    .dashboard-severity-progress-fixed,
+    .dashboard-severity-progress-confirmed { transition: none; }
 }
 
 .dashboard-quick-links {
@@ -13478,6 +14512,10 @@ header {
     overflow: hidden;
 }
 
+/* HTML5 hidden 属性默认 display:none 会被 .dashboard-cta-block 的 display:flex 覆盖，
+   补一条同特异性规则确保智能 CTA 隐藏逻辑生效 */
+.dashboard-cta-block[hidden] { display: none; }
+
 .dashboard-cta-content {
     display: flex;
     align-items: center;
@@ -13584,7 +14622,7 @@ header {
     .dashboard-tools-bar-fill {
         animation: none;
     }
-    .dashboard-bar-seg {
+    .dashboard-severity-donut .donut-segment {
         transition: none;
     }
 }
