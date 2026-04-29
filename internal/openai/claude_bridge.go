@@ -752,14 +752,18 @@ func isClaudeProvider(cfg *config.OpenAIConfig) bool {
 // Eino HTTP Client Bridge
 // ============================================================
 
-// NewEinoHTTPClient 为 einoopenai.ChatModelConfig 返回一个支持 Claude 自动桥接的 http.Client。
-// 当 cfg.Provider 为 claude 时，会拦截 /chat/completions 请求，透明转换为 Anthropic Messages API。
+// NewEinoHTTPClient 为 einoopenai.ChatModelConfig 返回一个 http.Client，包含两层 transport 包装：
+//  1. 当 cfg.Provider 为 claude 时，最内层套 claudeRoundTripper，把 OpenAI /chat/completions 透明
+//     桥接为 Anthropic /v1/messages（并把 Claude SSE 翻译回 OpenAI SSE 格式）。
+//  2. 最外层无条件套 einoSSESanitizingRoundTripper，吞掉中转站发的 SSE 心跳/注释/控制行
+//     (": keepalive" / "event: ping" / "retry: 3000" 等)，避免 Eino 用的 meguminnnnnnnnn/go-openai
+//     SDK 在累计超过 300 个非 "data:" 行后抛 "stream has sent too many empty messages"。
+//
+// 两层都对调用方完全透明：普通 JSON 响应原样透传，仅当响应 Content-Type 为 text/event-stream 时
+// sanitizer 才会接管 body；data: payload (含 [DONE]、{"error":...}) 一字节不改。
 func NewEinoHTTPClient(cfg *config.OpenAIConfig, base *http.Client) *http.Client {
 	if base == nil {
 		base = http.DefaultClient
-	}
-	if !isClaudeProvider(cfg) {
-		return base
 	}
 
 	cloned := *base
@@ -767,10 +771,14 @@ func NewEinoHTTPClient(cfg *config.OpenAIConfig, base *http.Client) *http.Client
 	if transport == nil {
 		transport = http.DefaultTransport
 	}
-	cloned.Transport = &claudeRoundTripper{
-		base:   transport,
-		config: cfg,
+	if isClaudeProvider(cfg) {
+		transport = &claudeRoundTripper{
+			base:   transport,
+			config: cfg,
+		}
 	}
+	transport = &einoSSESanitizingRoundTripper{base: transport}
+	cloned.Transport = transport
 	return &cloned
 }
 
