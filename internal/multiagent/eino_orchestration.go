@@ -95,6 +95,9 @@ func NewPlanExecuteRoot(ctx context.Context, a *PlanExecuteRootArgs) (adk.Resuma
 		}
 		execHandlers = append(execHandlers, sumMw)
 	}
+	// 5. 孤儿 tool 消息兜底：必须挂在所有改写历史中间件（summarization/reduction/skill）之后、
+	//    telemetry 之前，保证送入 ChatModel 的消息序列 tool_call ↔ tool_result 配对完整。
+	execHandlers = append(execHandlers, newOrphanToolPrunerMiddleware(a.Logger, "plan_execute_executor"))
 	if teleMw := newEinoModelInputTelemetryMiddleware(a.Logger, a.ModelName, a.ConversationID, "plan_execute_executor"); teleMw != nil {
 		execHandlers = append(execHandlers, teleMw)
 	}

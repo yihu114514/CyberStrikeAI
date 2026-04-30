@@ -257,6 +257,9 @@ func RunDeepAgent(
 				subHandlers = append(subHandlers, einoSkillMW)
 			}
 			subHandlers = append(subHandlers, subSumMw)
+			// 孤儿 tool 消息兜底：放在 summarization 之后，telemetry 之前，
+			// 以便 telemetry 记录的 token 数与 LLM 实际入参一致。
+			subHandlers = append(subHandlers, newOrphanToolPrunerMiddleware(logger, "sub_agent:"+id))
 			if teleMw := newEinoModelInputTelemetryMiddleware(logger, appCfg.OpenAI.Model, conversationID, "sub_agent"); teleMw != nil {
 				subHandlers = append(subHandlers, teleMw)
 			}
@@ -393,6 +396,7 @@ func RunDeepAgent(
 		deepHandlers = append(deepHandlers, einoSkillMW)
 	}
 	deepHandlers = append(deepHandlers, mainSumMw)
+	deepHandlers = append(deepHandlers, newOrphanToolPrunerMiddleware(logger, "deep_orchestrator"))
 	if teleMw := newEinoModelInputTelemetryMiddleware(logger, appCfg.OpenAI.Model, conversationID, "deep_orchestrator"); teleMw != nil {
 		deepHandlers = append(deepHandlers, teleMw)
 	}
@@ -405,6 +409,7 @@ func RunDeepAgent(
 		supHandlers = append(supHandlers, einoSkillMW)
 	}
 	supHandlers = append(supHandlers, mainSumMw)
+	supHandlers = append(supHandlers, newOrphanToolPrunerMiddleware(logger, "supervisor_orchestrator"))
 	if teleMw := newEinoModelInputTelemetryMiddleware(logger, appCfg.OpenAI.Model, conversationID, "supervisor_orchestrator"); teleMw != nil {
 		supHandlers = append(supHandlers, teleMw)
 	}
@@ -455,6 +460,8 @@ func RunDeepAgent(
 			FilesystemMiddleware: peFsMw,
 			PlannerReplannerRewriteHandlers: []adk.ChatModelAgentMiddleware{
 				mainSumMw,
+				// 孤儿 tool 消息兜底：必须挂在 summarization 之后、telemetry 之前。
+				newOrphanToolPrunerMiddleware(logger, "plan_execute_planner_replanner"),
 				newEinoModelInputTelemetryMiddleware(logger, appCfg.OpenAI.Model, conversationID, "plan_execute_planner_replanner_rewrite"),
 			},
 		})
