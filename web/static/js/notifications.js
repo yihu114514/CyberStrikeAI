@@ -129,6 +129,7 @@
         if ((item.type === 'task_completed' || item.type === 'long_running_tasks') && item.conversationId) return true;
         if (item.type === 'task_failed' && item.executionId) return true;
         if (item.type === 'hitl_pending') return true;
+        if (item.type === 'c2_session_online' && item.sessionId) return true;
         return false;
     }
 
@@ -153,6 +154,24 @@
         }
         if (item.type === 'hitl_pending') {
             window.location.hash = 'hitl';
+            return;
+        }
+        if (item.type === 'c2_session_online' && item.sessionId) {
+            if (typeof window.switchPage === 'function') {
+                window.switchPage('c2-sessions');
+            } else {
+                window.location.hash = 'c2-sessions';
+            }
+            const sid = item.sessionId;
+            window.setTimeout(function () {
+                if (typeof C2 === 'undefined' || !C2.loadSessions || !C2.selectSession) return;
+                var p = C2.loadSessions();
+                if (p && typeof p.then === 'function') {
+                    p.then(function () { C2.selectSession(sid); }).catch(function () {});
+                } else {
+                    window.setTimeout(function () { try { C2.selectSession(sid); } catch (e) {} }, 500);
+                }
+            }, 120);
         }
     }
 

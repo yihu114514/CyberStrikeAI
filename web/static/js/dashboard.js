@@ -103,7 +103,8 @@ async function refreshDashboard() {
             recentVulnsRes, rolesRes, agentsRes,
             openCriticalRes, openHighRes, openMediumRes, openLowRes, toolsConfigRes,
             hitlPendingRes, notificationsRes, externalMcpStatsRes,
-            webshellRes
+            webshellRes,
+            c2ListenersRes, c2SessionsRes, c2TasksRes
         ] = await Promise.all([
             fetchJson('/api/agent-loop/tasks'),
             fetchJson('/api/vulnerabilities/stats'),
@@ -129,7 +130,11 @@ async function refreshDashboard() {
             // External MCP 健康度
             fetchJson('/api/external-mcp/stats'),
             // WebShell 已建立的连接（pentest 落地后的 foothold，对运营场景非常关键）
-            fetchJson('/api/webshell/connections')
+            fetchJson('/api/webshell/connections'),
+            // C2 仪表盘条：监听器 / 会话 / 待处理任务（任务接口含 pending_queued_count）
+            fetchJson('/api/c2/listeners'),
+            fetchJson('/api/c2/sessions?limit=500'),
+            fetchJson('/api/c2/tasks?page=1&page_size=1')
         ]);
 
         // 如果在 await 期间 controller 已被 abort，说明又有新刷新启动了，丢弃本次结果
@@ -393,6 +398,9 @@ async function refreshDashboard() {
         // 「最近事件」内联展示（来自通知摘要，过滤掉已经被仪表盘其他位置覆盖的类型）
         renderRecentEvents(notificationsRes);
 
+        // C2 概览条（监听器 / 在线会话 / 待处理任务）
+        renderDashboardC2Overview(c2ListenersRes, c2SessionsRes, c2TasksRes);
+
         // 关键提醒条：把所有可能的告警源（漏洞/HITL/失败率/MCP健康）合并展示
         renderDashboardAlertBanner({
             criticalCount: openCriticalCount,
@@ -444,6 +452,8 @@ async function refreshDashboard() {
         ['tools', 'skills', 'knowledge', 'roles', 'agents', 'webshell'].forEach(function (k) {
             setEl('dashboard-resource-' + k, '-');
         });
+        var c2secErr = document.getElementById('dashboard-section-c2');
+        if (c2secErr) c2secErr.hidden = true;
         setRecentVulnsError();
         renderDashboardToolsBar(null);
         var ph = document.getElementById('dashboard-tools-pie-placeholder');
@@ -455,6 +465,53 @@ async function refreshDashboard() {
         // 第一次 refreshDashboard（无论成功与否）完成后即开启自动轮询 + 过期检查；
         // 重复调用是幂等的（内部判断 timer 是否已存在）。
         startDashboardAutoRefresh();
+    }
+}
+
+/** C2 概览条：依赖 /api/c2/listeners、sessions、tasks；任一路由失败则整块隐藏 */
+function renderDashboardC2Overview(listenersRes, sessionsRes, tasksRes) {
+    var section = document.getElementById('dashboard-section-c2');
+    if (!section) return;
+    if (listenersRes === null && sessionsRes === null && tasksRes === null) {
+        section.hidden = true;
+        return;
+    }
+    var running = '-';
+    if (listenersRes && Array.isArray(listenersRes.listeners)) {
+        running = String(listenersRes.listeners.filter(function (l) {
+            return (l && (l.status || '').toLowerCase() === 'running');
+        }).length);
+    } else if (listenersRes === null) {
+        running = '-';
+    } else {
+        running = '0';
+    }
+    var online = '-';
+    if (sessionsRes && Array.isArray(sessionsRes.sessions)) {
+        online = String(sessionsRes.sessions.filter(function (s) {
+            if (!s) return false;
+            var st = (s.status || '').toLowerCase();
+            return st === 'active' || st === 'sleeping';
+        }).length);
+    } else if (sessionsRes === null) {
+        online = '-';
+    } else {
+        online = '0';
+    }
+    var pending = '-';
+    if (tasksRes && typeof tasksRes.pending_queued_count === 'number') {
+        pending = String(tasksRes.pending_queued_count);
+    } else if (tasksRes === null) {
+        pending = '-';
+    } else {
+        pending = '0';
+    }
+    setEl('dashboard-c2-listeners-running', running);
+    setEl('dashboard-c2-sessions-online', online);
+    setEl('dashboard-c2-tasks-pending', pending);
+    section.hidden = false;
+    if (typeof applyTranslations === 'function') {
+        try { applyTranslations(section); } catch (_e) { /* ignore */ }
     }
 }
 

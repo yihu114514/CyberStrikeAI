@@ -142,6 +142,11 @@ function einoMainStreamPlanningTitle(responseData) {
         const label = typeof window.t === 'function' ? window.t(key) : '输出';
         return prefix + '📝 ' + label;
     }
+    // eino_single / deep / supervisor：主通道是模型流式输出，不是「规划」；模型偶发复述工具 stdout 时，旧文案易被误认为工具结果标题。
+    if (orch != null && String(orch).trim() !== '' && orch !== 'plan_execute') {
+        const streamLabel = typeof window.t === 'function' ? window.t('chat.assistantStreamPhase') : '助手输出';
+        return prefix + '📝 ' + streamLabel;
+    }
     const plan = typeof window.t === 'function' ? window.t('chat.planning') : '规划中';
     return prefix + '📝 ' + plan;
 }
@@ -1498,7 +1503,7 @@ function handleStreamEvent(event, progressElement, progressId,
             const itemId = addTimelineItem(timeline, 'thinking', {
                 title: title,
                 message: ' ',
-                data: responseData
+                data: Object.assign({}, responseData, { responseStreamPlaceholder: true })
             });
             responseStreamStateByProgressId.set(progressId, { itemId: itemId, buffer: '', streamMeta: responseData });
             break;
@@ -2197,6 +2202,9 @@ function addTimelineItem(timeline, type, options) {
     }
     if (options.data && options.data.orchestration != null && String(options.data.orchestration).trim() !== '') {
         item.dataset.orchestration = String(options.data.orchestration).trim();
+    }
+    if (options.data && options.data.responseStreamPlaceholder === true) {
+        item.dataset.responseStreamPlaceholder = '1';
     }
 
     // 使用传入的createdAt时间，如果没有则使用当前时间（向后兼容）
@@ -3154,7 +3162,12 @@ function refreshProgressAndTimelineI18n() {
                 titleSpan.textContent = ap + _t('chat.iterationRound', { n: n });
             }
         } else if (type === 'thinking') {
-            if (item.dataset.orchestration === 'plan_execute' && item.dataset.einoAgent && typeof einoMainStreamPlanningTitle === 'function') {
+            if (item.dataset.responseStreamPlaceholder === '1' && typeof einoMainStreamPlanningTitle === 'function') {
+                titleSpan.textContent = einoMainStreamPlanningTitle({
+                    orchestration: item.dataset.orchestration || '',
+                    einoAgent: item.dataset.einoAgent || ''
+                });
+            } else if (item.dataset.orchestration === 'plan_execute' && item.dataset.einoAgent && typeof einoMainStreamPlanningTitle === 'function') {
                 titleSpan.textContent = einoMainStreamPlanningTitle({
                     orchestration: 'plan_execute',
                     einoAgent: item.dataset.einoAgent
@@ -3163,10 +3176,10 @@ function refreshProgressAndTimelineI18n() {
                 titleSpan.textContent = ap + '\uD83E\uDD14 ' + _t('chat.aiThinking');
             }
         } else if (type === 'planning') {
-            if (item.dataset.orchestration === 'plan_execute' && item.dataset.einoAgent && typeof einoMainStreamPlanningTitle === 'function') {
+            if (item.dataset.orchestration && typeof einoMainStreamPlanningTitle === 'function') {
                 titleSpan.textContent = einoMainStreamPlanningTitle({
-                    orchestration: 'plan_execute',
-                    einoAgent: item.dataset.einoAgent
+                    orchestration: item.dataset.orchestration,
+                    einoAgent: item.dataset.einoAgent || ''
                 });
             } else {
                 titleSpan.textContent = ap + '\uD83D\uDCDD ' + _t('chat.planning');

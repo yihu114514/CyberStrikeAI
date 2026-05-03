@@ -12998,6 +12998,55 @@ header {
     .dashboard-kpi-row { grid-template-columns: 1fr; }
 }
 
+/* C2 概览：主列内卡片，外层样式复用 .dashboard-grid .dashboard-section */
+
+.dashboard-c2-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+@media (max-width: 720px) {
+    .dashboard-c2-strip { grid-template-columns: 1fr; }
+}
+
+.dashboard-c2-stat {
+    background: linear-gradient(145deg, #f8fafc 0%, #eef2ff 100%);
+    border-radius: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    border: 1px solid rgba(99, 102, 241, 0.14);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.dashboard-c2-stat:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(99, 102, 241, 0.12);
+    border-color: rgba(99, 102, 241, 0.28);
+}
+
+.dashboard-c2-stat:focus-visible {
+    outline: 2px solid rgba(99, 102, 241, 0.45);
+    outline-offset: 2px;
+}
+
+.dashboard-c2-stat-value {
+    font-size: 1.625rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+.dashboard-c2-stat-label {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
 .dashboard-kpi-card {
     background: #fff;
     border-radius: 14px;

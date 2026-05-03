@@ -7,6 +7,7 @@
     <link rel="icon" type="image/png" href="/static/logo.png">
     <link rel="shortcut icon" type="image/png" href="/static/favicon.ico">
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/c2.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.19.0/css/xterm.css">
 </head>
 <body>
@@ -176,6 +177,28 @@
                                 <line x1="12" y1="19" x2="20" y2="19"></line>
                             </svg>
                             <span data-i18n="nav.webshell">WebShell管理</span>
+                        </div>
+                    </div>
+                    <!-- C2 侧栏入口（带子菜单） -->
+                    <div class="nav-item nav-item-has-submenu" data-page="c2" id="nav-c2">
+                        <div class="nav-item-content" data-title="C2" onclick="window.toggleSubmenu('c2')" data-i18n="nav.c2" data-i18n-attr="data-title" data-i18n-skip-text="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                <path d="M2 17l10 5 10-5"></path>
+                                <path d="M2 12l10 5 10-5"></path>
+                            </svg>
+                            <span data-i18n="nav.c2">C2</span>
+                            <svg class="submenu-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="nav-submenu" id="submenu-c2">
+                            <div class="nav-submenu-item" data-page="c2-listeners" onclick="switchPage('c2-listeners')" data-i18n="nav.c2Listeners">监听器</div>
+                            <div class="nav-submenu-item" data-page="c2-sessions" onclick="switchPage('c2-sessions')" data-i18n="nav.c2Sessions">会话</div>
+                            <div class="nav-submenu-item" data-page="c2-tasks" onclick="switchPage('c2-tasks')" data-i18n="nav.c2Tasks">任务</div>
+                            <div class="nav-submenu-item" data-page="c2-payloads" onclick="switchPage('c2-payloads')" data-i18n="nav.c2Payloads">Payload</div>
+                            <div class="nav-submenu-item" data-page="c2-events" onclick="switchPage('c2-events')" data-i18n="nav.c2Events">事件</div>
+                            <div class="nav-submenu-item" data-page="c2-profiles" onclick="switchPage('c2-profiles')" data-i18n="nav.c2Profiles">流量伪装</div>
                         </div>
                     </div>
                     <div class="nav-item" data-page="chat-files">
@@ -533,6 +556,27 @@
                                         </div>
                                         <div class="dashboard-recent-vulns" id="dashboard-recent-vulns">
                                             <div class="dashboard-recent-vulns-empty" id="dashboard-recent-vulns-empty" data-i18n="dashboard.noVulnYet">暂无最近漏洞</div>
+                                        </div>
+                                    </section>
+                                    <!-- C2 概览：介于「最近漏洞」与「批量任务队列」之间 -->
+                                    <section class="dashboard-section dashboard-section-c2" id="dashboard-section-c2" hidden>
+                                        <div class="dashboard-section-header">
+                                            <h3 class="dashboard-section-title" data-i18n="dashboard.c2OverviewTitle">C2 概览</h3>
+                                            <a class="dashboard-section-link" onclick="switchPage('c2')" data-i18n="dashboard.c2GoManage">进入 C2 →</a>
+                                        </div>
+                                        <div class="dashboard-c2-strip">
+                                            <div class="dashboard-c2-stat" role="button" tabindex="0" onclick="switchPage('c2-listeners')" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); switchPage('c2-listeners'); }" data-i18n="dashboard.c2ClickListeners" data-i18n-attr="title" title="查看监听器">
+                                                <span class="dashboard-c2-stat-value" id="dashboard-c2-listeners-running">-</span>
+                                                <span class="dashboard-c2-stat-label" data-i18n="dashboard.c2ListenersRunning">运行中监听器</span>
+                                            </div>
+                                            <div class="dashboard-c2-stat" role="button" tabindex="0" onclick="switchPage('c2-sessions')" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); switchPage('c2-sessions'); }" data-i18n="dashboard.c2ClickSessions" data-i18n-attr="title" title="查看会话">
+                                                <span class="dashboard-c2-stat-value" id="dashboard-c2-sessions-online">-</span>
+                                                <span class="dashboard-c2-stat-label" data-i18n="dashboard.c2SessionsOnline">在线会话</span>
+                                            </div>
+                                            <div class="dashboard-c2-stat" role="button" tabindex="0" onclick="switchPage('c2-tasks')" onkeydown="if(event.key==='Enter'||event.key===' ') { event.preventDefault(); switchPage('c2-tasks'); }" data-i18n="dashboard.c2ClickTasks" data-i18n-attr="title" title="查看任务">
+                                                <span class="dashboard-c2-stat-value" id="dashboard-c2-tasks-pending">-</span>
+                                                <span class="dashboard-c2-stat-label" data-i18n="dashboard.c2TasksPending">待审 / 排队任务</span>
+                                            </div>
                                         </div>
                                     </section>
                                     <section class="dashboard-section dashboard-section-overview">
@@ -1503,6 +1547,212 @@
                                 <div id="batch-queues-pagination" class="pagination-container"></div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- C2 管理页面容器（各子页面通过 JS 动态渲染） -->
+                <div id="page-c2" class="page">
+                    <div class="page-header">
+                        <h2 data-i18n="c2.title">C2 管理</h2>
+                    </div>
+                    <div class="page-content" id="c2-content">
+                        <div class="c2-layout">
+                            <div id="c2-main" class="c2-main">
+                                <div class="c2-welcome">
+                                    <div class="c2-welcome-icon">
+                                        <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="url(#c2-grad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <defs><linearGradient id="c2-grad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#a855f7"/></linearGradient></defs>
+                                            <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                                            <path d="M2 17l10 5 10-5"></path>
+                                            <path d="M2 12l10 5 10-5"></path>
+                                        </svg>
+                                    </div>
+                                    <h3 data-i18n="c2.welcomeTitle">AI-Native C2 框架</h3>
+                                    <p data-i18n="c2.welcomeDesc">以 MCP 工具为一等公民，让 LLM 可以像调用 nmap 一样调用 C2 完成"上线 → 控制 → 任务 → 横向 → 清场"全流程</p>
+                                    <div class="c2-stats" id="c2-dashboard-stats">
+                                        <div class="c2-stat-item">
+                                            <span class="c2-stat-value" id="c2-stat-listeners">-</span>
+                                            <span class="c2-stat-label" data-i18n="c2.statListeners">运行中监听器</span>
+                                        </div>
+                                        <div class="c2-stat-item">
+                                            <span class="c2-stat-value" id="c2-stat-sessions">-</span>
+                                            <span class="c2-stat-label" data-i18n="c2.statSessions">在线会话</span>
+                                        </div>
+                                        <div class="c2-stat-item">
+                                            <span class="c2-stat-value" id="c2-stat-pending">-</span>
+                                            <span class="c2-stat-label" data-i18n="c2.statPending">待审任务</span>
+                                        </div>
+                                    </div>
+                                    <div class="c2-actions">
+                                        <button class="btn-primary" onclick="switchPage('c2-listeners')" data-i18n="c2.goListeners">管理监听器</button>
+                                        <button class="btn-secondary" onclick="switchPage('c2-sessions')" data-i18n="c2.goSessions">查看会话</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- C2 监听器管理页面 -->
+                <div id="page-c2-listeners" class="page">
+                    <div class="page-header">
+                        <h2 data-i18n="c2.listeners.title">监听器管理</h2>
+                        <div class="page-header-actions">
+                            <button class="btn-primary" onclick="C2.showCreateListenerModal()" data-i18n="c2.listeners.headerCreateBtn">+ 创建监听器</button>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <div id="c2-listener-grid" class="c2-listener-grid"></div>
+                    </div>
+                </div>
+
+                <!-- C2 会话管理页面 -->
+                <div id="page-c2-sessions" class="page">
+                    <div class="page-header">
+                        <h2 data-i18n="c2.sessions.title">会话管理</h2>
+                        <div class="page-header-actions">
+                            <button class="btn-secondary" onclick="C2.loadSessions()"><span data-i18n="common.refresh">刷新</span></button>
+                        </div>
+                    </div>
+                    <div class="page-content" style="padding:0;">
+                        <div class="c2-session-layout">
+                            <div id="c2-session-list" class="c2-session-sidebar"></div>
+                            <div id="c2-session-main" class="c2-session-main"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- C2 任务管理页面 -->
+                <div id="page-c2-tasks" class="page">
+                    <div class="page-header">
+                        <h2 data-i18n="c2.tasks.title">任务管理</h2>
+                        <div class="page-header-actions">
+                            <button type="button" class="btn-danger" id="c2-tasks-batch-delete" disabled onclick="C2.deleteSelectedTasks()"><span data-i18n="c2.tasks.batchDelete">批量删除</span></button>
+                            <button type="button" class="btn-secondary" onclick="C2.loadTasks()"><span data-i18n="common.refresh">刷新</span></button>
+                        </div>
+                    </div>
+                    <div class="page-content c2-tasks-page-wrap">
+                        <div class="c2-tasks-toolbar">
+                            <label class="c2-tasks-select-all-label">
+                                <input type="checkbox" id="c2-tasks-select-all" onchange="C2.onTasksSelectAll(this.checked)">
+                                <span data-i18n="c2.tasks.selectAll">全选本页</span>
+                            </label>
+                        </div>
+                        <div id="c2-task-list" class="c2-task-list-container"></div>
+                        <div id="c2-tasks-pagination" class="pagination-container"></div>
+                    </div>
+                </div>
+
+                <!-- C2 Payload 生成页面 -->
+                <div id="page-c2-payloads" class="page">
+                    <div class="page-header">
+                        <h2 data-i18n="c2.payloads.title">Payload 生成</h2>
+                    </div>
+                    <div class="page-content">
+                        <div class="c2-payload-grid">
+                            <div class="c2-payload-card">
+                                <h3>
+                                    <span class="c2-payload-icon" style="background:rgba(59,130,246,0.08);color:#3b82f6;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                                    </span>
+                                    <span data-i18n="c2.payloads.oneliner">单行 Payload</span>
+                                </h3>
+                                <p class="c2-payload-desc" data-i18n="c2.payloads.onelinerDesc">快速生成可在目标机直接执行的反弹命令，支持 Bash / Python / PowerShell / Curl</p>
+                                <div class="c2-form-group">
+                                    <label data-i18n="c2.payloads.listener">监听器</label>
+                                    <select id="c2-payload-listener" class="form-control"></select>
+                                </div>
+                                <div class="c2-form-group">
+                                    <label data-i18n="c2.payloads.kind">类型</label>
+                                    <select id="c2-payload-kind" class="form-control"></select>
+                                </div>
+                                <div class="c2-form-group">
+                                    <label data-i18n="c2.payloads.hostOptional">回连地址 (可选)</label>
+                                    <input type="text" id="c2-payload-host" class="form-control" data-i18n="c2.payloads.placeholderListenerHost" data-i18n-attr="placeholder" placeholder="留空则使用监听器地址">
+                                </div>
+                                <button type="button" id="c2-generate-oneliner-btn" class="btn-primary" onclick="C2.generateOneliner()" style="width:100%;" data-i18n="c2.payloads.generateOnelinerBtn">生成 Oneliner</button>
+                                <pre id="c2-oneliner-output" class="c2-oneliner-output" style="display:none;" onclick="C2.copyOneliner()" data-i18n="c2.payloads.clickToCopyTitle" data-i18n-attr="title" data-i18n-skip-text="true" title="点击复制"></pre>
+                            </div>
+                            <div class="c2-payload-card">
+                                <h3>
+                                    <span class="c2-payload-icon" style="background:rgba(16,185,129,0.08);color:#10b981;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line></svg>
+                                    </span>
+                                    <span data-i18n="c2.payloads.build">编译 Beacon 二进制</span>
+                                </h3>
+                                <p class="c2-payload-desc" data-i18n="c2.payloads.buildDesc">交叉编译支持多平台的完整 Beacon 可执行文件，支持 Linux / Windows / macOS</p>
+                                <div class="c2-form-group">
+                                    <label data-i18n="c2.payloads.listener">监听器</label>
+                                    <select id="c2-build-listener" class="form-control"></select>
+                                    <p id="c2-build-loopback-hint" class="form-hint" style="display:none;margin-top:8px;color:#b45309;"></p>
+                                </div>
+                                <div class="c2-form-group">
+                                    <label data-i18n="c2.payloads.hostOptional">回连地址（可选）</label>
+                                    <input type="text" id="c2-build-host" class="form-control" data-i18n="c2.payloads.placeholderListenerHost" data-i18n-attr="placeholder" placeholder="留空则使用监听器地址">
+                                </div>
+                                <div class="c2-form-row">
+                                    <div class="c2-form-group">
+                                        <label data-i18n="c2.payloads.os">目标系统</label>
+                                        <select id="c2-build-os" class="form-control">
+                                            <option value="linux" data-i18n="c2.payloads.linux">Linux</option>
+                                            <option value="windows" data-i18n="c2.payloads.windows">Windows</option>
+                                            <option value="darwin" data-i18n="c2.payloads.darwin">macOS</option>
+                                        </select>
+                                    </div>
+                                    <div class="c2-form-group">
+                                        <label data-i18n="c2.payloads.arch">目标架构</label>
+                                        <select id="c2-build-arch" class="form-control">
+                                            <option value="amd64" data-i18n="c2.payloads.amd64">AMD64</option>
+                                            <option value="arm64" data-i18n="c2.payloads.arm64">ARM64</option>
+                                            <option value="386" data-i18n="c2.payloads.386">386</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button id="c2-build-btn" type="button" class="btn-primary" onclick="C2.buildBeacon()" style="width:100%;" data-i18n="c2.payloads.buildBeaconBtn">构建 Beacon</button>
+                                <div id="c2-build-result"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- C2 事件审计页面 -->
+                <div id="page-c2-events" class="page">
+                    <div class="page-header">
+                        <h2 data-i18n="c2.events.title">事件审计</h2>
+                        <div class="page-header-actions">
+                            <button type="button" class="btn-danger" id="c2-events-batch-delete" disabled onclick="C2.deleteSelectedEvents()"><span data-i18n="c2.events.batchDelete">批量删除</span></button>
+                            <button type="button" class="btn-secondary" onclick="C2.loadEvents()"><span data-i18n="common.refresh">刷新</span></button>
+                        </div>
+                    </div>
+                    <div class="page-content c2-events-page-wrap">
+                        <div class="c2-events-toolbar">
+                            <label class="c2-events-select-all-label">
+                                <input type="checkbox" id="c2-events-select-all" onchange="C2.onEventsSelectAll(this.checked)">
+                                <span data-i18n="c2.events.selectAll">全选本页</span>
+                            </label>
+                        </div>
+                        <div id="c2-event-list" class="c2-event-list"></div>
+                        <div id="c2-events-pagination" class="pagination-container"></div>
+                    </div>
+                </div>
+
+                <!-- C2 Profile 管理页面 -->
+                <div id="page-c2-profiles" class="page">
+                    <div class="page-header">
+                        <h2 data-i18n="c2.profiles.title">流量伪装</h2>
+                        <div class="page-header-actions">
+                            <button class="btn-primary" onclick="C2.showCreateProfileModal()" data-i18n="c2.profiles.createBtn">+ 创建 Profile</button>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <div id="c2-profile-list" class="c2-profile-list"></div>
+                    </div>
+                </div>
+
+                <!-- C2 模态框 -->
+                <div id="c2-modal" class="c2-modal-overlay" style="display:none;" onclick="if(event.target===this)C2.closeModal()">
+                    <div class="c2-modal" onclick="event.stopPropagation()">
+                        <div id="c2-modal-content"></div>
                     </div>
                 </div>
 
@@ -3108,6 +3358,7 @@
     <script src="/static/js/chat-files.js"></script>
     <script src="/static/js/tasks.js"></script>
     <script src="/static/js/roles.js"></script>
+    <script src="/static/js/c2.js"></script>
 </body>
 </html>
 
